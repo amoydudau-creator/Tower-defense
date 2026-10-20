@@ -1,0 +1,2248 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Tower Defense Simulator - Roblox Edition</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-dark: #0b0e14;
+            --bg-panel: #151922;
+            --border-color: #262c3a;
+            --blue: #0088ff;
+            --green: #00e676;
+            --red: #ff3b3b;
+            --yellow: #ffbe0b;
+        }
+
+        * { user-select: none; -webkit-user-select: none; box-sizing: border-box; }
+        body {
+            font-family: 'Nunito', sans-serif;
+            overflow: hidden;
+            background-color: var(--bg-dark);
+            margin: 0;
+            padding: 0;
+            color: white;
+        }
+        .font-game { font-family: 'Fredoka One', cursive; letter-spacing: 0.5px; }
+        
+        #canvas-container { position: absolute; inset: 0; z-index: 1; outline: none; }
+        #ui-layer { position: absolute; inset: 0; z-index: 10; pointer-events: none; }
+        .interactive { pointer-events: auto; }
+
+        /* Roblox Style 3D Buttons */
+        .btn {
+            font-family: 'Fredoka One', cursive;
+            border-radius: 12px;
+            transition: all 0.12s cubic-bezier(0.34, 1.56, 0.64, 1);
+            border: 2px solid rgba(255,255,255,0.15);
+            text-shadow: 0 2px 3px rgba(0,0,0,0.5);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            cursor: pointer;
+            text-transform: uppercase;
+        }
+        .btn:hover:not(:disabled) { filter: brightness(1.1); transform: translateY(-2px); }
+        .btn:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 0 0 transparent !important; }
+        .btn:disabled { opacity: 0.45; filter: grayscale(0.8); cursor: not-allowed; }
+        
+        .btn-blue { background: linear-gradient(180deg, #1aa3ff, #0066cc); box-shadow: 0 5px 0 #004488; }
+        .btn-green { background: linear-gradient(180deg, #10f587, #00b359); box-shadow: 0 5px 0 #00773b; }
+        .btn-red { background: linear-gradient(180deg, #ff5252, #cc1111); box-shadow: 0 5px 0 #880000; }
+        .btn-purple { background: linear-gradient(180deg, #b86bff, #7e22ce); box-shadow: 0 5px 0 #4c1182; }
+        .btn-yellow { background: linear-gradient(180deg, #ffd13b, #d99b00); box-shadow: 0 5px 0 #946600; color: #111; text-shadow: none; }
+        .btn-dark { background: linear-gradient(180deg, #374151, #1f2937); box-shadow: 0 4px 0 #0f172a; }
+
+        /* Panels */
+        .panel {
+            background: var(--bg-panel);
+            border: 2px solid var(--border-color);
+            border-radius: 18px;
+            box-shadow: 0 12px 30px rgba(0,0,0,0.65);
+        }
+
+        /* Hub Layout */
+        #hub-sidebar {
+            width: 270px;
+            background: rgba(12, 15, 20, 0.96);
+            border-right: 2px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        }
+        #hub-content {
+            flex: 1;
+            height: 100vh;
+            overflow-y: auto;
+            padding: 2rem;
+            background: radial-gradient(circle at top right, rgba(0, 136, 255, 0.14), rgba(10, 12, 18, 0.88));
+            backdrop-filter: blur(8px);
+        }
+        
+        .tab-btn {
+            padding: 1rem 1.25rem;
+            font-family: 'Fredoka One', cursive;
+            font-size: 1.05rem;
+            color: #9ca3af;
+            text-align: left;
+            transition: 0.2s;
+            border-left: 4px solid transparent;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+        }
+        .tab-btn:hover { background: rgba(255,255,255,0.05); color: white; }
+        .tab-btn.active {
+            background: rgba(0, 136, 255, 0.14);
+            color: #38bdf8;
+            border-left-color: #38bdf8;
+        }
+
+        .tab-section { display: none; animation: fadeIn 0.25s ease; }
+        .tab-section.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 10px; }
+        ::-webkit-scrollbar-track { background: #0b0d12; }
+        ::-webkit-scrollbar-thumb { background: #374151; border-radius: 6px; border: 2px solid #0b0d12; }
+        ::-webkit-scrollbar-thumb:hover { background: #4b5563; }
+
+        /* Armory Cards */
+        .tower-card {
+            background: linear-gradient(180deg, #1f2430 0%, #151821 100%);
+            border: 2px solid #2e3442;
+            border-radius: 16px;
+            padding: 16px;
+            min-height: 270px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+        .tower-card:hover {
+            border-color: #38bdf8;
+            transform: translateY(-4px);
+            box-shadow: 0 10px 25px rgba(0, 136, 255, 0.2);
+        }
+        .tower-card.equipped {
+            border-color: var(--green);
+            box-shadow: 0 0 20px rgba(0, 230, 118, 0.2);
+            background: linear-gradient(180deg, #182b24 0%, #121c18 100%);
+        }
+        .tower-card.unlocked {
+            border-color: #3b82f6;
+        }
+
+        /* In-Game Hotbar */
+        .hotbar-slot {
+            width: 90px;
+            height: 106px;
+            background: rgba(18, 22, 30, 0.94);
+            border: 2px solid #333947;
+            border-radius: 14px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            position: relative;
+        }
+        .hotbar-slot:hover { border-color: #38bdf8; transform: translateY(-5px); }
+        .hotbar-slot.selected {
+            border-color: var(--green);
+            background: rgba(16, 48, 34, 0.95);
+            transform: translateY(-8px);
+            box-shadow: 0 8px 20px rgba(0, 230, 118, 0.35);
+        }
+        .hotbar-slot.cant-afford { opacity: 0.5; filter: grayscale(0.5); }
+
+        /* VFX Layer & Enemy Overhead HP Tags */
+        #vfx-layer { position: absolute; inset: 0; pointer-events: none; z-index: 5; overflow: hidden; }
+        .dmg-text {
+            position: absolute;
+            font-family: 'Fredoka One', cursive;
+            font-size: 19px;
+            text-shadow: 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+            animation: floatUp 0.8s ease-out forwards;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 20;
+            white-space: nowrap;
+        }
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translate(-50%, -50%) scale(0.6); }
+            25% { transform: translate(-50%, -85%) scale(1.15); }
+            100% { opacity: 0; transform: translate(-50%, -175%) scale(0.95); }
+        }
+        
+        /* Overhead Enemy Health Tag */
+        .enemy-hud-tag {
+            position: absolute;
+            transform: translate(-50%, -100%);
+            pointer-events: none;
+            z-index: 8;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 78px;
+        }
+        .enemy-name-label {
+            font-family: 'Fredoka One', cursive;
+            font-size: 10px;
+            color: #fff;
+            text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+            line-height: 1.1;
+            margin-bottom: 2px;
+            letter-spacing: 0.4px;
+        }
+        .enemy-hp-box {
+            width: 76px;
+            height: 14px;
+            background: rgba(10, 12, 16, 0.92);
+            border: 1.5px solid #000;
+            border-radius: 5px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.6);
+        }
+        .enemy-hp-fill {
+            height: 100%;
+            background: #00e676;
+            transition: width 0.08s linear, background-color 0.2s ease;
+        }
+        .enemy-hp-num {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Nunito', sans-serif;
+            font-weight: 900;
+            font-size: 9.5px;
+            color: #ffffff;
+            text-shadow: 1px 1px 1px #000, -1px -1px 1px #000;
+            white-space: nowrap;
+        }
+
+        /* Toast Notifications */
+        #toast-container {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            align-items: center;
+            pointer-events: none;
+        }
+        .toast {
+            background: rgba(17, 20, 28, 0.96);
+            border: 2px solid var(--blue);
+            color: white;
+            padding: 10px 22px;
+            border-radius: 12px;
+            font-family: 'Fredoka One', cursive;
+            font-size: 14px;
+            animation: slideDown 0.25s ease, fadeOut 0.3s ease 2.7s forwards;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.65);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        @keyframes slideDown { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+    </style>
+</head>
+<body>
+
+    <!-- 3D Scene Container -->
+    <div id="canvas-container"></div>
+    <!-- Floating Enemy HP Tags & Damage Popups -->
+    <div id="vfx-layer"></div>
+    <!-- Toast Notifications -->
+    <div id="toast-container"></div>
+
+    <!-- UI Layer -->
+    <div id="ui-layer" class="w-full h-full">
+        
+        <!-- ==================== MAIN HUB MENU ==================== -->
+        <div id="hub-ui" class="interactive w-full h-full flex">
+            
+            <!-- Left Sidebar -->
+            <div id="hub-sidebar">
+                <div class="p-5 text-center border-b border-[#262c3a]">
+                    <div class="w-16 h-16 mx-auto bg-gradient-to-br from-blue-400 to-indigo-600 rounded-2xl border-4 border-[#151922] flex items-center justify-center mb-2 shadow-lg">
+                        <i class="fa-solid fa-shield-halved text-3xl text-white"></i>
+                    </div>
+                    <h1 class="font-game text-xl leading-tight text-white">TOWER DEFENSE<br><span class="text-sky-400 text-sm">ROBLOX EDITION</span></h1>
+                </div>
+
+                <!-- Player Profile & Shop Coins (Gold 🪙) -->
+                <div class="p-4 border-b border-[#262c3a] bg-[#10141b]">
+                    <div class="flex justify-between items-end mb-1">
+                        <span class="text-xs font-extrabold text-gray-400">NIVEL <span id="hub-level" class="text-white text-base font-game">1</span></span>
+                        <span class="text-[11px] font-bold text-sky-400"><span id="hub-xp">0</span> / <span id="hub-max-xp">100</span> XP</span>
+                    </div>
+                    <div class="w-full h-2.5 bg-gray-800 rounded-full overflow-hidden border border-gray-700 mb-4">
+                        <div id="hub-xp-bar" class="h-full bg-sky-500 w-0 transition-all duration-300"></div>
+                    </div>
+
+                    <div class="text-[10px] font-extrabold text-yellow-400/90 uppercase tracking-wider mb-1">
+                        🪙 Monedas de Tienda (Armería)
+                    </div>
+                    <div class="flex items-center justify-between bg-[#090b10] p-3 rounded-xl border-2 border-yellow-500/40 shadow-inner">
+                        <div class="flex items-center gap-2.5">
+                            <i class="fa-solid fa-coins text-yellow-400 text-2xl"></i>
+                            <span id="hub-coins" class="font-game text-yellow-400 text-2xl">150</span>
+                        </div>
+                        <span class="text-[10px] font-extrabold bg-yellow-500/15 text-yellow-300 px-2 py-0.5 rounded border border-yellow-500/30">TIENDA</span>
+                    </div>
+                    <p class="text-[11px] text-gray-400 mt-2 leading-snug">
+                        Gana <b class="text-yellow-400">🪙 Monedas</b> al vencer partidas para desbloquear tropas permanentemente.
+                    </p>
+                    <button onclick="cheatLevelUp()" class="mt-2 w-full text-[11px] text-gray-500 hover:text-sky-400 text-right font-bold transition">⚡ Admin: +5 Niveles</button>
+                </div>
+
+                <!-- Navigation Tabs -->
+                <div class="flex flex-col py-2 flex-1">
+                    <div onclick="switchTab('tab-play')" class="tab-btn active" id="btn-tab-play">
+                        <i class="fa-solid fa-gamepad w-6 text-center"></i> Jugar Partida
+                    </div>
+                    <div onclick="switchTab('tab-armory')" class="tab-btn" id="btn-tab-armory">
+                        <i class="fa-solid fa-store w-6 text-center"></i> Armería & Tienda
+                    </div>
+                    <div onclick="switchTab('tab-coop')" class="tab-btn" id="btn-tab-coop">
+                        <i class="fa-solid fa-user-group w-6 text-center"></i> Sala Co-Op
+                    </div>
+                    <div onclick="switchTab('tab-trade')" class="tab-btn" id="btn-tab-trade">
+                        <i class="fa-solid fa-handshake w-6 text-center"></i> Tradeo (Nvl 20)
+                    </div>
+                </div>
+
+                <div class="p-3.5 border-t border-[#262c3a] bg-[#0d1017] text-center text-[11px] text-gray-400 font-bold">
+                    🪙 Monedas = Tienda &nbsp;|&nbsp; <span class="text-emerald-400">💵 Efectivo $ = Partida</span>
+                </div>
+            </div>
+
+            <!-- Right Hub Content -->
+            <div id="hub-content">
+                
+                <!-- 1. PLAY TAB -->
+                <div id="tab-play" class="tab-section active max-w-5xl mx-auto">
+                    <div class="flex flex-wrap justify-between items-center gap-4 mb-6">
+                        <div>
+                            <h2 class="font-game text-4xl text-white mb-1">Selecciona Modo de Juego</h2>
+                            <p class="text-gray-300 text-sm">
+                                En partida usarás <span class="text-emerald-400 font-extrabold">💵 Efectivo ($)</span> para desplegar y mejorar tus unidades. Al ganar recibirás <span class="text-yellow-400 font-extrabold">🪙 Monedas de Tienda</span>.
+                            </p>
+                        </div>
+                        <button onclick="switchTab('tab-armory')" class="btn btn-blue px-5 py-3 text-sm">
+                            <i class="fa-solid fa-box-open"></i> EQUIPAR TROPAS (<span id="play-loadout-count">1</span>/5)
+                        </button>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- EASY MODE -->
+                        <div class="panel p-6 flex flex-col justify-between border-2 border-emerald-500/40 hover:border-emerald-400 transition cursor-pointer" onclick="startGame('easy')">
+                            <div>
+                                <div class="flex justify-between items-center mb-2">
+                                    <h3 class="font-game text-3xl text-emerald-400">NIVEL FÁCIL</h3>
+                                    <span class="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-xs font-extrabold px-3 py-1 rounded-full">15 Oleadas</span>
+                                </div>
+                                <p class="text-sm text-gray-300 mb-4">Enemigos con vida base estándar (HP x1.0). Ideal para comenzar y desbloquear tus primeras unidades.</p>
+                                <div class="bg-[#0d1118] p-3 rounded-xl border border-gray-800 space-y-1.5 text-xs mb-5">
+                                    <div class="flex justify-between"><span class="text-gray-400 font-bold">Efectivo Inicial en Partida:</span><span class="text-emerald-400 font-extrabold">💵 $650</span></div>
+                                    <div class="flex justify-between"><span class="text-gray-400 font-bold">Vida de los Enemigos:</span><span class="text-white font-extrabold">x1.0 HP (Normal)</span></div>
+                                    <div class="flex justify-between"><span class="text-gray-400 font-bold">Premio por Ganar:</span><span class="text-yellow-400 font-game text-sm">+100 Monedas 🪙</span></div>
+                                </div>
+                            </div>
+                            <button class="btn btn-green py-3.5 w-full text-lg pointer-events-none">JUGAR FÁCIL (+100 🪙)</button>
+                        </div>
+
+                        <!-- MEDIUM MODE -->
+                        <div class="panel p-6 flex flex-col justify-between border-2 border-sky-500/40 hover:border-sky-400 transition cursor-pointer" onclick="startGame('medium')">
+                            <div>
+                                <div class="flex justify-between items-center mb-2">
+                                    <h3 class="font-game text-3xl text-sky-400">NIVEL MEDIO</h3>
+                                    <span class="bg-sky-500/20 text-sky-300 border border-sky-500/40 text-xs font-extrabold px-3 py-1 rounded-full">20 Oleadas</span>
+                                </div>
+                                <p class="text-sm text-gray-300 mb-4">Enemigos más resistentes y oleadas más densas. Requiere mejorar bien tus tropas en partida.</p>
+                                <div class="bg-[#0d1118] p-3 rounded-xl border border-gray-800 space-y-1.5 text-xs mb-5">
+                                    <div class="flex justify-between"><span class="text-gray-400 font-bold">Efectivo Inicial en Partida:</span><span class="text-emerald-400 font-extrabold">💵 $600</span></div>
+                                    <div class="flex justify-between"><span class="text-gray-400 font-bold">Vida de los Enemigos:</span><span class="text-sky-300 font-extrabold">x1.65 HP (Resistente)</span></div>
+                                    <div class="flex justify-between"><span class="text-gray-400 font-bold">Premio por Ganar:</span><span class="text-yellow-400 font-game text-sm">+300 Monedas 🪙</span></div>
+                                </div>
+                            </div>
+                            <button class="btn btn-blue py-3.5 w-full text-lg pointer-events-none">JUGAR MEDIO (+300 🪙)</button>
+                        </div>
+
+                        <!-- HARD MODE -->
+                        <div class="panel p-6 flex flex-col justify-between border-2 border-purple-500/40 hover:border-purple-400 transition cursor-pointer" onclick="startGame('hard')">
+                            <div>
+                                <div class="flex justify-between items-center mb-2">
+                                    <h3 class="font-game text-3xl text-purple-400">NIVEL DIFÍCIL</h3>
+                                    <span class="bg-purple-500/20 text-purple-300 border border-purple-500/40 text-xs font-extrabold px-3 py-1 rounded-full">25 Oleadas</span>
+                                </div>
+                                <p class="text-sm text-gray-300 mb-4">¡Desafío extremo! Los enemigos tienen mucha más vida (HP x2.5) y aparecen jefes acorazados.</p>
+                                <div class="bg-[#0d1118] p-3 rounded-xl border border-gray-800 space-y-1.5 text-xs mb-5">
+                                    <div class="flex justify-between"><span class="text-gray-400 font-bold">Efectivo Inicial en Partida:</span><span class="text-emerald-400 font-extrabold">💵 $550</span></div>
+                                    <div class="flex justify-between"><span class="text-gray-400 font-bold">Vida de los Enemigos:</span><span class="text-purple-300 font-extrabold">x2.50 HP (Muy Alta)</span></div>
+                                    <div class="flex justify-between"><span class="text-gray-400 font-bold">Premio por Ganar:</span><span class="text-yellow-400 font-game text-sm">+500 Monedas 🪙</span></div>
+                                </div>
+                            </div>
+                            <button class="btn btn-purple py-3.5 w-full text-lg pointer-events-none">JUGAR DIFÍCIL (+500 🪙)</button>
+                        </div>
+
+                        <!-- ENDLESS MODE -->
+                        <div class="panel p-6 flex flex-col justify-between border-2 border-red-500/60 hover:border-red-400 transition cursor-pointer" onclick="startGame('endless')">
+                            <div>
+                                <div class="flex justify-between items-center mb-2">
+                                    <h3 class="font-game text-3xl text-red-400"><i class="fa-solid fa-infinity mr-1"></i> ENDLESS</h3>
+                                    <span class="bg-red-500/20 text-red-300 border border-red-500/40 text-xs font-extrabold px-3 py-1 rounded-full">Infinito</span>
+                                </div>
+                                <p class="text-sm text-gray-300 mb-4">Hordas sin fin donde la vida enemiga sube exponencialmente cada oleada.</p>
+                                <div class="bg-[#0d1118] p-3 rounded-xl border border-gray-800 space-y-1.5 text-xs mb-5">
+                                    <div class="flex justify-between"><span class="text-gray-400 font-bold">Efectivo Inicial en Partida:</span><span class="text-emerald-400 font-extrabold">💵 $800</span></div>
+                                    <div class="flex justify-between"><span class="text-gray-400 font-bold">Vida de los Enemigos:</span><span class="text-red-400 font-extrabold">Escalado Exponencial</span></div>
+                                    <div class="flex justify-between"><span class="text-gray-400 font-bold">Premio Continuo:</span><span class="text-yellow-400 font-game text-sm">+25 🪙 por cada oleada</span></div>
+                                </div>
+                            </div>
+                            <button class="btn btn-red py-3.5 w-full text-lg pointer-events-none">MODO ENDLESS (+25 🪙/OLA)</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. ARMORY & SHOP TAB -->
+                <div id="tab-armory" class="tab-section max-w-6xl mx-auto pb-16">
+                    <div class="flex flex-wrap justify-between items-center gap-4 mb-6">
+                        <div>
+                            <h2 class="font-game text-4xl text-white mb-1">Armería y Tienda de Tropas</h2>
+                            <p class="text-gray-300 text-sm">
+                                Usa tus <span class="text-yellow-400 font-bold">🪙 Monedas de Tienda</span> para desbloquear tropas. También verás el coste en <span class="text-emerald-400 font-bold">💵 Efectivo ($)</span> para desplegarlas dentro de la partida.
+                            </p>
+                        </div>
+                        <div class="flex items-center gap-3 bg-[#10141d] px-5 py-3 rounded-2xl border-2 border-yellow-500/50 shadow-lg">
+                            <i class="fa-solid fa-coins text-yellow-400 text-2xl"></i>
+                            <div>
+                                <div class="text-[10px] text-gray-400 font-extrabold uppercase">Monedas de Tienda</div>
+                                <div id="armory-coins" class="font-game text-2xl text-yellow-400">150</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Equipped Loadout Deck (5 Slots) -->
+                    <div class="panel p-5 mb-8 border-sky-500/40 bg-[#131822]">
+                        <div class="flex justify-between items-center mb-3">
+                            <h3 class="font-game text-lg text-sky-400 uppercase"><i class="fa-solid fa-layer-group mr-2"></i>Tu Loadout Equipado (<span id="armory-eq-count">1</span>/5)</h3>
+                            <span class="text-xs text-gray-400 font-bold">Haz clic en una tropa equipada para quitarla</span>
+                        </div>
+                        <div class="grid grid-cols-2 sm:grid-cols-5 gap-4" id="armory-loadout"></div>
+                    </div>
+
+                    <!-- Full 15 Tower Catalog -->
+                    <h3 class="font-game text-2xl text-white mb-4 uppercase"><i class="fa-solid fa-store text-yellow-400 mr-2"></i>Catálogo Completo (15 Unidades TDS)</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5 pb-12" id="armory-catalog"></div>
+                </div>
+
+                <!-- 3. CO-OP TAB -->
+                <div id="tab-coop" class="tab-section max-w-3xl mx-auto pt-8">
+                    <div class="panel p-8 max-w-md mx-auto text-center border-sky-500/40">
+                        <i class="fa-solid fa-users text-6xl text-sky-400 mb-4"></i>
+                        <h2 class="font-game text-3xl mb-2">LOBBY CO-OP</h2>
+                        <p class="text-sm text-gray-300 mb-6">Crea una sala táctica para jugar en equipo o introduce el código de 4 dígitos de tu amigo.</p>
+                        
+                        <div id="coop-box-init" class="space-y-4">
+                            <button onclick="createCoopRoom()" class="btn btn-blue w-full py-4 text-lg">
+                                <i class="fa-solid fa-plus-circle"></i> CREAR SALA CO-OP
+                            </button>
+                            <div class="flex items-center gap-4"><div class="flex-1 h-px bg-gray-700"></div><span class="text-gray-500 font-bold text-xs">O ÚNETE CON CÓDIGO</span><div class="flex-1 h-px bg-gray-700"></div></div>
+                            <div class="flex gap-2">
+                                <input id="coop-input" type="text" maxlength="4" placeholder="1234" class="flex-1 bg-[#0e1015] border-2 border-[#262c3a] rounded-xl px-4 text-center font-game text-2xl text-white focus:outline-none focus:border-sky-500">
+                                <button onclick="joinCoopRoom()" class="btn btn-green px-6 py-4">UNIRSE</button>
+                            </div>
+                        </div>
+
+                        <div id="coop-box-wait" class="hidden flex-col items-center">
+                            <div class="bg-[#0e1015] border-2 border-yellow-500/50 rounded-xl p-4 w-full mb-4">
+                                <div class="text-xs text-gray-400 font-bold">CÓDIGO DE SALA</div>
+                                <div id="coop-code-text" class="font-game text-4xl text-yellow-400 tracking-widest mt-1">4829</div>
+                            </div>
+                            <p id="coop-status-msg" class="text-sm text-sky-300 font-bold mb-5 animate-pulse">Esperando jugadores...</p>
+                            <button id="coop-start-btn" onclick="startGame('medium')" class="btn btn-green w-full py-4 text-lg hidden">
+                                <i class="fa-solid fa-play"></i> INICIAR PARTIDA CO-OP
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. TRADE TAB -->
+                <div id="tab-trade" class="tab-section max-w-4xl mx-auto pt-8">
+                    <div id="trade-locked" class="panel p-10 max-w-md mx-auto text-center border-yellow-500/40">
+                        <i class="fa-solid fa-lock text-6xl text-yellow-400 mb-4"></i>
+                        <h2 class="font-game text-3xl mb-2">PLAZA DE TRADEO</h2>
+                        <p class="text-gray-300 text-sm mb-6">Necesitas alcanzar el <span class="text-yellow-400 font-bold">Nivel 20</span> para desbloquear el intercambio de unidades y monedas.</p>
+                        <div class="bg-red-500/20 border border-red-500/40 text-red-300 py-3 px-4 rounded-xl font-bold text-sm mb-4">
+                            Nivel Actual: <span id="trade-lvl-txt">1</span> / 20
+                        </div>
+                        <button onclick="cheatLevelUp()" class="btn btn-yellow w-full py-3 text-sm">SUBIR +5 NIVELES (PROBAR TRADEO)</button>
+                    </div>
+
+                    <div id="trade-unlocked" class="hidden panel p-8 max-w-xl mx-auto text-center border-green-500/50">
+                        <i class="fa-solid fa-handshake text-5xl text-green-400 mb-3"></i>
+                        <h2 class="font-game text-3xl mb-2">MERCADO DE INTERCAMBIO</h2>
+                        <p class="text-gray-300 text-sm mb-6">¡Nivel 20+ verificado! Ofertas activas de otros comandantes:</p>
+                        <div class="space-y-3 text-left mb-6">
+                            <div class="bg-[#11141c] p-4 rounded-xl border border-gray-700 flex justify-between items-center">
+                                <div>
+                                    <div class="font-game text-sky-400">Comandante: TDS_Legend</div>
+                                    <div class="text-xs text-gray-300">Pide: <span class="text-yellow-400 font-bold">200 🪙 Monedas</span> ➔ Entrega: <span class="text-green-400 font-bold">Unidad Militant</span></div>
+                                </div>
+                                <button onclick="executeTrade('militant', 200)" class="btn btn-green px-4 py-2 text-xs">INTERCAMBIAR</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- ==================== IN-GAME HUD ==================== -->
+        <div id="game-ui" class="w-full h-full flex-col justify-between pointer-events-none" style="display: none;">
+            
+            <!-- Top Bar -->
+            <div class="p-4 flex flex-wrap justify-between items-start gap-4 interactive w-full">
+                <!-- Left: In-Game Cash ($), Shop Coins (🪙) & Base Health -->
+                <div class="flex flex-wrap gap-3">
+                    <!-- IN-GAME CASH ($) -->
+                    <div class="panel px-5 py-2.5 flex items-center gap-3 bg-[#111722]/95 border-2 border-emerald-500/60 shadow-lg">
+                        <div class="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-400 flex items-center justify-center text-emerald-400 text-xl">
+                            <i class="fa-solid fa-dollar-sign"></i>
+                        </div>
+                        <div>
+                            <div class="text-[10px] font-extrabold text-emerald-300 uppercase leading-none mb-1">Efectivo de Partida</div>
+                            <div id="ig-cash" class="font-game text-2xl text-emerald-400 leading-none">$650</div>
+                        </div>
+                    </div>
+
+                    <!-- BASE HP -->
+                    <div class="panel px-5 py-2.5 flex items-center gap-3 bg-[#111722]/95 border-2 border-red-500/50">
+                        <div class="w-10 h-10 rounded-xl bg-red-500/20 border border-red-400 flex items-center justify-center text-red-400 text-xl">
+                            <i class="fa-solid fa-heart"></i>
+                        </div>
+                        <div>
+                            <div class="text-[10px] font-extrabold text-gray-400 uppercase leading-none mb-1">Salud Base</div>
+                            <div id="ig-hp" class="font-game text-2xl text-white leading-none">100 / 100</div>
+                        </div>
+                    </div>
+
+                    <!-- SHOP COINS DISPLAY (READ-ONLY REFERENCE IN MATCH) -->
+                    <div class="panel px-4 py-2.5 hidden sm:flex items-center gap-2.5 bg-[#111722]/90 border border-yellow-500/40" title="Monedas para la Tienda fuera de partida">
+                        <i class="fa-solid fa-coins text-yellow-400 text-lg"></i>
+                        <div>
+                            <div class="text-[9px] font-extrabold text-gray-400 uppercase leading-none mb-0.5">Monedas Tienda</div>
+                            <div id="ig-shop-coins" class="font-game text-base text-yellow-400 leading-none">150 🪙</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Center: Wave Status & Start Wave Button -->
+                <div class="flex flex-col items-center">
+                    <div class="panel px-7 py-2.5 text-center bg-[#111722]/95 border-2 border-sky-500/50 min-w-[250px]">
+                        <div id="ig-mode-badge" class="text-[10px] font-extrabold text-yellow-400 uppercase tracking-widest mb-0.5">MODO FÁCIL • PREMIO: +100 🪙</div>
+                        <div id="ig-wave" class="font-game text-2xl text-white">Oleada 0 / 15</div>
+                        <div id="ig-enemies-left" class="text-[11px] font-bold text-sky-400 uppercase">Preparando defensas</div>
+                    </div>
+                    <button id="btn-next-wave" onclick="startNextWave()" class="btn btn-green py-2.5 px-7 text-sm mt-2 shadow-xl">
+                        <i class="fa-solid fa-play"></i> INICIAR OLEADA
+                    </button>
+                </div>
+
+                <!-- Right: Speed, Auto-Wave & Return to Hub -->
+                <div class="flex flex-col gap-2">
+                    <div class="flex gap-2">
+                        <button id="btn-speed" onclick="toggleSpeed()" class="btn btn-dark px-3.5 py-2 text-xs w-32 flex justify-between">
+                            <span>Velocidad</span><span id="txt-speed" class="text-yellow-400 font-bold">x1</span>
+                        </button>
+                        <button id="btn-auto" onclick="toggleAuto()" class="btn btn-dark px-3.5 py-2 text-xs w-32 flex justify-between">
+                            <span>Auto Oleada</span><span id="txt-auto" class="text-red-400 font-bold">OFF</span>
+                        </button>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="resetCameraSideCenter()" class="btn btn-dark px-3 py-2 text-xs flex-1" title="Centrar Vista">
+                            <i class="fa-solid fa-arrows-left-right"></i> Centrar
+                        </button>
+                        <button onclick="returnToHub()" class="btn btn-red px-3.5 py-2 text-xs flex-1">
+                            <i class="fa-solid fa-door-open"></i> Salir al Hub
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Side: Tower Upgrade & Sell Inspector Panel (Uses In-Game Cash $) -->
+            <div id="inspector-ui" class="absolute top-28 right-5 w-80 panel flex-col hidden interactive border-2 border-sky-500 bg-[#121620]/95 backdrop-blur-md shadow-2xl z-30">
+                <div class="p-4 border-b border-[#262c3a] flex justify-between items-center bg-[#0b0e15] rounded-t-[16px]">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-sky-500/20 border border-sky-400 flex items-center justify-center text-white text-xl">
+                            <i id="insp-icon" class="fa-solid fa-person-rifle"></i>
+                        </div>
+                        <div>
+                            <h3 id="insp-name" class="font-game text-xl text-white leading-none">Scout</h3>
+                            <span id="insp-lvl" class="text-xs font-extrabold text-yellow-400 uppercase tracking-wider">NIVEL 1 / 5</span>
+                        </div>
+                    </div>
+                    <button onclick="closeInspector()" class="text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 w-8 h-8 rounded-lg flex items-center justify-center transition">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+
+                <div class="p-4 space-y-3">
+                    <!-- Target Priority Selector -->
+                    <div class="flex items-center justify-between bg-[#0b0e15] p-2.5 rounded-xl border border-[#262c3a] text-xs">
+                        <span class="text-gray-400 font-bold uppercase"><i class="fa-solid fa-bullseye text-red-400 mr-1"></i> Objetivo:</span>
+                        <button id="insp-target-btn" onclick="cycleTargetMode()" class="bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/40 px-3 py-1 rounded-lg font-game uppercase transition">
+                            Primero
+                        </button>
+                    </div>
+
+                    <!-- Stats & Next Level Preview -->
+                    <div class="bg-[#0b0e15] rounded-xl p-3 space-y-2 text-xs border border-[#262c3a]">
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-400 font-bold"><i class="fa-solid fa-burst w-5 text-red-400"></i> Daño:</span>
+                            <span id="insp-dmg" class="font-extrabold text-white">14 <span class="text-emerald-400">➔ 21</span></span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-400 font-bold"><i class="fa-solid fa-stopwatch w-5 text-sky-400"></i> Cadencia:</span>
+                            <span id="insp-rate" class="font-extrabold text-white">0.75s <span class="text-emerald-400">➔ 0.65s</span></span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-400 font-bold"><i class="fa-solid fa-ruler-horizontal w-5 text-purple-400"></i> Alcance:</span>
+                            <span id="insp-rng" class="font-extrabold text-white">13m <span class="text-emerald-400">➔ 15m</span></span>
+                        </div>
+                        <div class="flex justify-between items-center pt-1.5 border-t border-gray-800">
+                            <span class="text-gray-400 font-bold"><i class="fa-solid fa-skull w-5 text-yellow-400"></i> Eliminaciones:</span>
+                            <span id="insp-kills" class="font-game text-yellow-400">0</span>
+                        </div>
+                    </div>
+
+                    <div id="insp-next-perk" class="text-[11px] text-center text-sky-300 font-bold bg-sky-950/40 border border-sky-500/30 rounded-lg py-1.5 px-2">
+                        Mejora visual 3D y +50% potencia
+                    </div>
+
+                    <!-- Action Buttons: Upgrade (E) & Sell (X) using In-Game Cash ($) -->
+                    <div class="flex flex-col gap-2 pt-1">
+                        <button id="btn-upg" onclick="upgradeSelectedTower()" class="btn btn-green w-full py-3 flex justify-between px-4 text-sm">
+                            <span><i class="fa-solid fa-circle-arrow-up mr-1"></i> MEJORAR (E)</span>
+                            <span id="insp-cost" class="bg-black/30 px-2.5 py-0.5 rounded-lg text-white font-extrabold">💵 $150</span>
+                        </button>
+                        <button onclick="sellSelectedTower()" class="btn btn-red w-full py-2.5 flex justify-between px-4 text-xs">
+                            <span><i class="fa-solid fa-sack-dollar mr-1"></i> VENDER (X)</span>
+                            <span id="insp-sell" class="bg-black/30 px-2 py-0.5 rounded-lg text-emerald-200 font-extrabold">+$140</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom Bar: Placement Hint & 5-Slot Hotbar -->
+            <div class="pb-5 w-full flex flex-col items-center interactive">
+                <div id="placement-hint" class="hidden bg-[#0b0e15]/95 px-6 py-2 rounded-full border-2 border-sky-500 text-white text-xs font-bold mb-3 items-center gap-4 shadow-2xl">
+                    <span id="placement-hint-text">Haz clic en el mapa para desplegar la unidad</span>
+                    <span class="w-px h-4 bg-gray-600"></span>
+                    <button onclick="cancelPlacement()" class="text-red-400 hover:text-red-300 font-game uppercase"><i class="fa-solid fa-xmark mr-1"></i> Cancelar (ESC)</button>
+                </div>
+
+                <!-- Equipped Troops Hotbar -->
+                <div class="panel p-2.5 flex gap-3 bg-[#10141d]/95 border-[#262c3a] shadow-2xl" id="ig-hotbar"></div>
+            </div>
+        </div>
+
+        <!-- ==================== END GAME MODAL ==================== -->
+        <div id="end-screen" class="absolute inset-0 bg-black/85 backdrop-blur-md interactive items-center justify-center z-50" style="display: none;">
+            <div class="panel p-8 max-w-md w-full text-center border-t-8" id="end-panel">
+                <i id="end-icon" class="fa-solid fa-trophy text-7xl mb-4 text-yellow-400"></i>
+                <h2 id="end-title" class="font-game text-4xl mb-2 text-white">¡VICTORIA!</h2>
+                <p id="end-desc" class="text-gray-300 mb-6 text-sm">Has defendido la base militar con éxito.</p>
+                
+                <div class="bg-[#0b0e15] border border-[#262c3a] rounded-xl p-4 mb-6 space-y-3 text-left text-sm">
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-400 font-bold">Oleadas Superadas:</span>
+                        <span id="end-waves" class="font-game text-white text-lg">15 / 15</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-400 font-bold">Monedas de Tienda Ganadas:</span>
+                        <span id="end-coins" class="font-game text-yellow-400 text-xl">+100 🪙</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-400 font-bold">Experiencia Ganada:</span>
+                        <span id="end-xp" class="font-game text-sky-400 text-lg">+180 XP</span>
+                    </div>
+                </div>
+
+                <button onclick="returnToHub()" class="btn btn-blue w-full py-3.5 text-lg">IR A LA ARMERÍA</button>
+            </div>
+        </div>
+
+    </div>
+
+<script>
+// ==========================================
+// 1. BASE DE DATOS: 15 TROPAS TDS (CON 2 COSTES SEPARADOS: TIENDA 🪙 Y PARTIDA 💵)
+// ==========================================
+// shopCost = Monedas de Tienda (🪙) para desbloquear en la Armería
+// placeCost = Efectivo de Partida ($) para colocar en el mapa durante la batalla
+const TOWER_DB = {
+    scout: {
+        name: 'Scout', role: 'Pistola Rápida Inicial',
+        shopCost: 0, placeCost: 200, damage: 14, rate: 0.75, range: 13,
+        cliff: false, color: 0x0088ff, hatColor: 0x0044aa, icon: 'fa-person-rifle'
+    },
+    sniper: {
+        name: 'Sniper', role: 'Francotirador de Montaña',
+        shopCost: 100, placeCost: 300, damage: 55, rate: 2.0, range: 32,
+        cliff: true, color: 0x8b5cf6, hatColor: 0x4c1d95, icon: 'fa-crosshairs'
+    },
+    demoman: {
+        name: 'Demoman', role: 'Granadas Explosivas en Área',
+        shopCost: 150, placeCost: 375, damage: 40, rate: 1.5, range: 13, aoe: 5.5,
+        cliff: false, color: 0xf97316, hatColor: 0x9a3412, icon: 'fa-bomb'
+    },
+    soldier: {
+        name: 'Soldier', role: 'Ráfagas Militares Constantes',
+        shopCost: 200, placeCost: 350, damage: 20, rate: 0.42, range: 15,
+        cliff: false, color: 0x22c55e, hatColor: 0x14532d, icon: 'fa-person-military-pointing'
+    },
+    farm: {
+        name: 'Farm', role: 'Genera +Efectivo ($) por Oleada',
+        shopCost: 250, placeCost: 250, damage: 0, rate: 0, range: 6, isFarm: true,
+        cliff: false, color: 0xeab308, hatColor: 0x713f12, icon: 'fa-wheat-awn'
+    },
+    pyro: {
+        name: 'Pyromancer', role: 'Lanzallamas Quema-Hordas',
+        shopCost: 300, placeCost: 450, damage: 14, rate: 0.22, range: 10, aoe: 3.8, slows: true,
+        cliff: false, color: 0xef4444, hatColor: 0x7f1d1d, icon: 'fa-fire-burner'
+    },
+    militant: {
+        name: 'Militant', role: 'Asalto Táctico Pesado',
+        shopCost: 400, placeCost: 550, damage: 28, rate: 0.32, range: 16,
+        cliff: false, color: 0x0ea5e9, hatColor: 0x0369a1, icon: 'fa-gun'
+    },
+    medic: {
+        name: 'Medic', role: 'Cura la Base cada Ronda y Ataca',
+        shopCost: 450, placeCost: 500, damage: 26, rate: 0.55, range: 14, isMedic: true,
+        cliff: false, color: 0xf43f5e, hatColor: 0xffffff, icon: 'fa-suitcase-medical'
+    },
+    warden: {
+        name: 'Warden', role: 'Porra Eléctrica Aturdidora',
+        shopCost: 550, placeCost: 650, damage: 65, rate: 0.65, range: 9, slows: true,
+        cliff: false, color: 0x2563eb, hatColor: 0x1e3a8a, icon: 'fa-shield-halved'
+    },
+    commander: {
+        name: 'Commander', role: 'Líder de Apoyo y Artillería',
+        shopCost: 650, placeCost: 700, damage: 55, rate: 0.65, range: 18,
+        cliff: false, color: 0x3b82f6, hatColor: 0x1d4ed8, icon: 'fa-bullhorn'
+    },
+    dj: {
+        name: 'DJ Booth', role: 'Onda Sónica de Área y Soporte',
+        shopCost: 750, placeCost: 750, damage: 32, rate: 0.5, range: 17, aoe: 5.0,
+        cliff: false, color: 0xec4899, hatColor: 0x831843, icon: 'fa-headphones'
+    },
+    minigunner: {
+        name: 'Minigunner', role: 'Metralleta Gatling Extrema',
+        shopCost: 900, placeCost: 1200, damage: 22, rate: 0.12, range: 16,
+        cliff: false, color: 0xf59e0b, hatColor: 0x92400e, icon: 'fa-burst'
+    },
+    ranger: {
+        name: 'Ranger', role: 'Cañón Riel Letal de Montaña',
+        shopCost: 1100, placeCost: 1600, damage: 260, rate: 2.5, range: 44,
+        cliff: true, color: 0x9333ea, hatColor: 0x4c1d95, icon: 'fa-vr-cardboard'
+    },
+    accelerator: {
+        name: 'Accelerator', role: 'Rayo de Plasma Sobrecargado',
+        shopCost: 1400, placeCost: 2200, damage: 48, rate: 0.1, range: 20,
+        cliff: false, color: 0x06b6d4, hatColor: 0x155e75, icon: 'fa-bolt'
+    },
+    engineer: {
+        name: 'Engineer', role: 'Artillería Mecánica Suprema',
+        shopCost: 1700, placeCost: 2500, damage: 95, rate: 0.25, range: 19, aoe: 4.0,
+        cliff: false, color: 0x10b981, hatColor: 0x064e3b, icon: 'fa-wrench'
+    }
+};
+
+// Variantes de enemigos con escalado real por oleada y dificultad
+const ENEMY_DB = {
+    normal: { name: 'Zombie', hp: 40, speed: 4.8, cashReward: 25, color: 0x64748b, skin: 0x84cc16, scale: 1.0 },
+    speedy: { name: 'Speedy', hp: 30, speed: 8.2, cashReward: 32, color: 0xfacc15, skin: 0xfef08a, scale: 0.88 },
+    slow:   { name: 'Tank',   hp: 150, speed: 3.1, cashReward: 60, color: 0x334155, skin: 0x64748b, scale: 1.3 },
+    hidden: { name: 'Shadow', hp: 95, speed: 6.2, cashReward: 50, color: 0x4c1d95, skin: 0xa855f7, scale: 1.05 },
+    boss:   { name: 'Grave Boss', hp: 700, speed: 2.2, cashReward: 250, color: 0xdc2626, skin: 0x991b1b, scale: 1.8 }
+};
+
+// ==========================================
+// 2. SONIDO WEB AUDIO API
+// ==========================================
+class SoundEngine {
+    constructor() { this.ctx = null; }
+    init() {
+        if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+    }
+    play(type) {
+        try {
+            this.init();
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.connect(gain); gain.connect(this.ctx.destination);
+            const now = this.ctx.currentTime;
+            if (type === 'shoot') {
+                osc.type = 'sawtooth'; osc.frequency.setValueAtTime(300, now);
+                osc.frequency.exponentialRampToValueAtTime(100, now + 0.055);
+                gain.gain.setValueAtTime(0.05, now); gain.gain.linearRampToValueAtTime(0.004, now + 0.055);
+                osc.start(now); osc.stop(now + 0.055);
+            } else if (type === 'place' || type === 'upgrade') {
+                osc.type = 'triangle'; osc.frequency.setValueAtTime(420, now);
+                osc.frequency.exponentialRampToValueAtTime(840, now + 0.14);
+                gain.gain.setValueAtTime(0.11, now); gain.gain.linearRampToValueAtTime(0.01, now + 0.14);
+                osc.start(now); osc.stop(now + 0.14);
+            } else if (type === 'coin' || type === 'buy') {
+                osc.type = 'sine'; osc.frequency.setValueAtTime(587.33, now);
+                osc.frequency.setValueAtTime(880, now + 0.07);
+                gain.gain.setValueAtTime(0.12, now); gain.gain.linearRampToValueAtTime(0.01, now + 0.2);
+                osc.start(now); osc.stop(now + 0.2);
+            } else if (type === 'sell') {
+                osc.type = 'sine'; osc.frequency.setValueAtTime(500, now);
+                osc.frequency.exponentialRampToValueAtTime(240, now + 0.12);
+                gain.gain.setValueAtTime(0.1, now); gain.gain.linearRampToValueAtTime(0.01, now + 0.12);
+                osc.start(now); osc.stop(now + 0.12);
+            }
+        } catch (e) {}
+    }
+}
+const sfx = new SoundEngine();
+
+// ==========================================
+// 3. ECONOMÍA DOBLE: MONEDAS DE TIENDA (🪙) VS EFECTIVO DE PARTIDA (💵 $)
+// ==========================================
+let pData = {
+    shopCoins: 150, // Monedas de Tienda (🪙) fuera de partida (Bono inicial de 150 🪙)
+    level: 1,
+    xp: 0,
+    unlocked: ['scout'], // Empiezas solo con 1 unidad: Scout
+    loadout: ['scout', null, null, null, null]
+};
+
+try {
+    const saved = JSON.parse(localStorage.getItem('tds_dual_currency_save_v1'));
+    if (saved && typeof saved.shopCoins === 'number') {
+        pData.shopCoins = saved.shopCoins;
+        pData.level = saved.level || 1;
+        pData.xp = saved.xp || 0;
+        pData.unlocked = Array.isArray(saved.unlocked) && saved.unlocked.length ? saved.unlocked : ['scout'];
+        pData.loadout = Array.isArray(saved.loadout) && saved.loadout.length === 5 ? saved.loadout : ['scout', null, null, null, null];
+    }
+} catch (e) {}
+
+function savePlayerData() {
+    try { localStorage.setItem('tds_dual_currency_save_v1', JSON.stringify(pData)); } catch (e) {}
+}
+
+// Estado de la partida activa (Efectivo $ separado de las Monedas 🪙)
+let gState = {
+    mode: 'hub',
+    difficulty: 'easy',
+    matchCash: 650, // 💵 Efectivo de Partida ($) para colocar y mejorar tropas
+    hp: 100,
+    wave: 0,
+    maxWave: 15,
+    active: false,
+    speed: 1,
+    auto: false,
+    enemiesQueue: [],
+    spawnTimer: 0,
+    towers: [],
+    enemies: [],
+    projectiles: [],
+    selectedId: null,
+    inspectedTower: null,
+    keys: { left: false, right: false }
+};
+
+function addShopCoins(amount) {
+    pData.shopCoins = Math.max(0, Math.floor(pData.shopCoins + amount));
+    savePlayerData();
+    updateUIStats();
+}
+
+function spendShopCoins(amount) {
+    if (pData.shopCoins < amount) return false;
+    pData.shopCoins = Math.floor(pData.shopCoins - amount);
+    savePlayerData();
+    updateUIStats();
+    return true;
+}
+
+function addMatchCash(amount) {
+    gState.matchCash = Math.max(0, Math.floor(gState.matchCash + amount));
+    updateUIStats();
+}
+
+function spendMatchCash(amount) {
+    if (gState.matchCash < amount) return false;
+    gState.matchCash = Math.floor(gState.matchCash - amount);
+    updateUIStats();
+    return true;
+}
+
+function updateUIStats() {
+    const coinsFormatted = pData.shopCoins.toLocaleString();
+    document.getElementById('hub-coins').innerText = coinsFormatted;
+    document.getElementById('armory-coins').innerText = coinsFormatted;
+    document.getElementById('ig-shop-coins').innerText = `${coinsFormatted} 🪙`;
+
+    document.getElementById('ig-cash').innerText = `$${gState.matchCash.toLocaleString()}`;
+    document.getElementById('hub-level').innerText = pData.level;
+    document.getElementById('hub-xp').innerText = pData.xp;
+    const needed = pData.level * 100;
+    document.getElementById('hub-max-xp').innerText = needed;
+    document.getElementById('hub-xp-bar').style.width = `${Math.min(100, (pData.xp / needed) * 100)}%`;
+    document.getElementById('trade-lvl-txt').innerText = pData.level;
+
+    const eqCount = pData.loadout.filter(x => x !== null).length;
+    document.getElementById('play-loadout-count').innerText = eqCount;
+    document.getElementById('armory-eq-count').innerText = eqCount;
+
+    if (gState.mode === 'game') {
+        pData.loadout.forEach(key => {
+            if (!key) return;
+            const el = document.getElementById('slot-' + key);
+            if (el) el.classList.toggle('cant-afford', gState.matchCash < TOWER_DB[key].placeCost);
+        });
+        if (gState.inspectedTower) refreshInspectorUI(gState.inspectedTower);
+    }
+}
+
+function addXp(amount) {
+    pData.xp += amount;
+    while (pData.xp >= pData.level * 100) {
+        pData.xp -= pData.level * 100;
+        pData.level++;
+        showToast(`🎉 ¡Subiste al Nivel ${pData.level}!`, true);
+    }
+    savePlayerData();
+    updateUIStats();
+    checkTradeTab();
+}
+
+function cheatLevelUp() {
+    pData.level += 5;
+    savePlayerData();
+    updateUIStats();
+    checkTradeTab();
+    showToast(`⚡ Nivel aumentado a ${pData.level}`, true);
+}
+
+function showToast(msg, isSuccess = false) {
+    const box = document.createElement('div');
+    box.className = 'toast';
+    box.style.borderColor = isSuccess ? 'var(--green)' : 'var(--blue)';
+    box.innerHTML = `<i class="fa-solid ${isSuccess ? 'fa-circle-check text-green-400' : 'fa-circle-info text-sky-400'}"></i> <span>${msg}</span>`;
+    document.getElementById('toast-container').appendChild(box);
+    setTimeout(() => box.remove(), 2900);
+}
+
+// ==========================================
+// 4. ESCENA THREE.JS SIN OBJETOS MARRONES EN EL MEDIO
+// ==========================================
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0b0f17);
+scene.fog = new THREE.FogExp2(0x0b0f17, 0.0042);
+
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+// Cámara bloqueada en altura/inclinación: solo movimiento lateral Lado a Lado
+const CAMERA_FIXED_Y = 52;
+const CAMERA_FIXED_Z = 62;
+let cameraX = 0;
+
+function syncSideToSideCamera() {
+    cameraX = Math.max(-42, Math.min(42, cameraX));
+    camera.position.set(cameraX, CAMERA_FIXED_Y, CAMERA_FIXED_Z);
+    camera.lookAt(cameraX, 0, -4);
+}
+syncSideToSideCamera();
+
+// Iluminación
+scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
+dirLight.position.set(45, 85, 50);
+dirLight.castShadow = true;
+dirLight.shadow.mapSize.width = 1024;
+dirLight.shadow.mapSize.height = 1024;
+dirLight.shadow.camera.left = -65;
+dirLight.shadow.camera.right = 65;
+dirLight.shadow.camera.top = 65;
+dirLight.shadow.camera.bottom = -65;
+scene.add(dirLight);
+
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+const clock = new THREE.Clock();
+
+// Nodos ortogonales de la pasarela
+const pathNodes = [
+    new THREE.Vector3(-42, 0, -22),
+    new THREE.Vector3(-14, 0, -22),
+    new THREE.Vector3(-14, 0, 14),
+    new THREE.Vector3(16, 0, 14),
+    new THREE.Vector3(16, 0, -18),
+    new THREE.Vector3(42, 0, -18)
+];
+
+let groundPlane, cliffColliders = [];
+let placementIndicator, rangeRing;
+
+function distToSegment(p, v, w) {
+    const l2 = v.distanceToSquared(w);
+    if (l2 === 0) return p.distanceTo(v);
+    let t = ((p.x - v.x) * (w.x - v.x) + (p.z - v.z) * (w.z - v.z)) / l2;
+    t = Math.max(0, Math.min(1, t));
+    const proj = new THREE.Vector3(v.x + t * (w.x - v.x), 0, v.z + t * (w.z - v.z));
+    return p.distanceTo(proj);
+}
+
+function buildCleanMapEnvironment() {
+    // 1. Suelo Ajedrezado Verde Estilo Roblox
+    const texCanvas = document.createElement('canvas');
+    texCanvas.width = 128; texCanvas.height = 128;
+    const ctx = texCanvas.getContext('2d');
+    ctx.fillStyle = '#182c1f'; ctx.fillRect(0, 0, 128, 128);
+    ctx.fillStyle = '#1e3626'; ctx.fillRect(0, 0, 64, 64); ctx.fillRect(64, 64, 64, 64);
+    const tex = new THREE.CanvasTexture(texCanvas);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(32, 32);
+    
+    const groundGeo = new THREE.PlaneGeometry(260, 260);
+    groundGeo.rotateX(-Math.PI / 2);
+    groundPlane = new THREE.Mesh(groundGeo, new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9 }));
+    groundPlane.receiveShadow = true;
+    scene.add(groundPlane);
+
+    // 2. Pasarela Horizontal Limpia de Asfalto Oscuro (#1e293b) y Bordes Neón (#00d4ff)
+    // Se construye con BoxGeometry plano horizontal sin rotaciones verticales
+    const roadMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.85 });
+    const neonMat = new THREE.MeshBasicMaterial({ color: 0x00d4ff });
+    const roadWidth = 7.0;
+
+    for (let i = 0; i < pathNodes.length - 1; i++) {
+        const p1 = pathNodes[i];
+        const p2 = pathNodes[i + 1];
+        const cx = (p1.x + p2.x) / 2;
+        const cz = (p1.z + p2.z) / 2;
+        const dx = Math.abs(p2.x - p1.x);
+        const dz = Math.abs(p2.z - p1.z);
+
+        // Losa horizontal plana (altura = 0.08)
+        const boxW = dx > 0 ? dx + roadWidth : roadWidth;
+        const boxD = dz > 0 ? dz + roadWidth : roadWidth;
+        const roadSlab = new THREE.Mesh(new THREE.BoxGeometry(boxW, 0.08, boxD), roadMat);
+        roadSlab.position.set(cx, 0.04, cz);
+        roadSlab.receiveShadow = true;
+        scene.add(roadSlab);
+
+        // Rieles de neón azul brillante a los lados del segmento
+        if (dx > 0) {
+            // Segmento horizontal a lo largo de X
+            const railTop = new THREE.Mesh(new THREE.BoxGeometry(dx + roadWidth, 0.16, 0.28), neonMat);
+            railTop.position.set(cx, 0.1, cz - roadWidth / 2);
+            const railBot = new THREE.Mesh(new THREE.BoxGeometry(dx + roadWidth, 0.16, 0.28), neonMat);
+            railBot.position.set(cx, 0.1, cz + roadWidth / 2);
+            scene.add(railTop, railBot);
+        } else {
+            // Segmento vertical a lo largo de Z
+            const railLeft = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.16, dz + roadWidth), neonMat);
+            railLeft.position.set(cx - roadWidth / 2, 0.1, cz);
+            const railRight = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.16, dz + roadWidth), neonMat);
+            railRight.position.set(cx + roadWidth / 2, 0.1, cz);
+            scene.add(railLeft, railRight);
+        }
+    }
+
+    // 3. Montañas Escalonadas Limpias (Tiered Cliffs de Roca Gris y Cima Verde)
+    function buildTieredCliff(x, z, tiers, baseW) {
+        const group = new THREE.Group();
+        const rockM = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.85 });
+        const grassM = new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.7 });
+        let hTotal = 0;
+        
+        for (let i = 0; i < tiers; i++) {
+            const w = baseW - (i * 2.4);
+            const h = 2.4;
+            const yC = hTotal + (h / 2);
+            const r = new THREE.Mesh(new THREE.BoxGeometry(w, h, w), rockM);
+            r.position.y = yC; r.castShadow = true; r.receiveShadow = true;
+            group.add(r);
+
+            const g = new THREE.Mesh(new THREE.BoxGeometry(w + 0.2, 0.35, w + 0.2), grassM);
+            g.position.y = yC + (h / 2); g.receiveShadow = true;
+            group.add(g);
+            hTotal += h;
+        }
+        
+        const topWidth = baseW - ((tiers - 1) * 2.4);
+        const col = new THREE.Mesh(
+            new THREE.BoxGeometry(topWidth, hTotal + 0.4, topWidth),
+            new THREE.MeshBasicMaterial({ visible: false })
+        );
+        col.position.y = hTotal / 2;
+        col.userData.isCliff = true;
+        col.userData.topY = hTotal + 0.2;
+        group.add(col);
+        cliffColliders.push(col);
+        
+        group.position.set(x, 0, z);
+        scene.add(group);
+    }
+    
+    buildTieredCliff(-30, -5, 3, 12.5);
+    buildTieredCliff(1, 25, 3, 13.5);
+    buildTieredCliff(31, -2, 3, 12.5);
+
+    // 4. Pinos Low-Poly SOLO en el perímetro exterior (radio > 42 del centro, sin troncos marrones altos)
+    const leafMatDark = new THREE.MeshStandardMaterial({ color: 0x14532d, flatShading: true });
+    const leafMatLight = new THREE.MeshStandardMaterial({ color: 0x166534, flatShading: true });
+    const baseStoneMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.9 });
+
+    for (let i = 0; i < 40; i++) {
+        const angle = (i / 40) * Math.PI * 2 + (Math.random() * 0.12);
+        const radius = 44 + Math.random() * 28;
+        const px = Math.cos(angle) * radius * 1.25;
+        const pz = Math.sin(angle) * radius * 0.85;
+        const p = new THREE.Vector3(px, 0, pz);
+
+        // Garantizar que ningún pino esté cerca del camino
+        let nearRoad = false;
+        for (let j = 0; j < pathNodes.length - 1; j++) {
+            if (distToSegment(p, pathNodes[j], pathNodes[j + 1]) < 14) { nearRoad = true; break; }
+        }
+        if (nearRoad) continue;
+
+        const pine = new THREE.Group();
+        const stoneBase = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.6, 0.6, 6), baseStoneMat);
+        stoneBase.position.y = 0.3;
+        const cone1 = new THREE.Mesh(new THREE.ConeGeometry(2.2, 3.2, 6), leafMatDark);
+        cone1.position.y = 2.0; cone1.castShadow = true;
+        const cone2 = new THREE.Mesh(new THREE.ConeGeometry(1.7, 2.8, 6), leafMatLight);
+        cone2.position.y = 3.7; cone2.castShadow = true;
+        pine.add(stoneBase, cone1, cone2);
+        pine.position.copy(p);
+        scene.add(pine);
+    }
+
+    // 5. Portal Morado de Aparición (Spawn) y Base Militar al Final
+    const portal = new THREE.Mesh(
+        new THREE.TorusGeometry(3.4, 0.65, 16, 32),
+        new THREE.MeshBasicMaterial({ color: 0xa855f7 })
+    );
+    portal.position.copy(pathNodes[0]);
+    portal.position.y = 3.6;
+    portal.rotation.y = Math.PI / 2;
+    scene.add(portal);
+    
+    const baseG = new THREE.Group();
+    const b1 = new THREE.Mesh(new THREE.BoxGeometry(10, 8.5, 10), new THREE.MeshStandardMaterial({ color: 0x1d4ed8 }));
+    b1.position.y = 4.25; b1.castShadow = true;
+    const b2 = new THREE.Mesh(new THREE.BoxGeometry(4.2, 5.2, 10.4), new THREE.MeshStandardMaterial({ color: 0x0f172a }));
+    b2.position.y = 2.6;
+    baseG.add(b1, b2);
+    baseG.position.copy(pathNodes[pathNodes.length - 1]);
+    scene.add(baseG);
+
+    // 6. Indicadores de Colocación y Rango
+    placementIndicator = new THREE.Mesh(
+        new THREE.CylinderGeometry(1.3, 1.3, 2.2, 20),
+        new THREE.MeshBasicMaterial({ color: 0x00ff00, transparent: true, opacity: 0.45 })
+    );
+    placementIndicator.visible = false;
+    scene.add(placementIndicator);
+
+    rangeRing = new THREE.Mesh(
+        new THREE.RingGeometry(0.88, 1.0, 48),
+        new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.45, side: THREE.DoubleSide })
+    );
+    rangeRing.rotateX(-Math.PI / 2);
+    rangeRing.visible = false;
+    scene.add(rangeRing);
+}
+buildCleanMapEnvironment();
+
+// ==========================================
+// 5. NAVEGACIÓN DEL HUB Y ARMERÍA (CON MONEDAS 🪙 Y EFECTIVO 💵)
+// ==========================================
+function switchTab(tabId) {
+    document.querySelectorAll('.tab-section').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    document.getElementById(tabId).classList.add('active');
+    document.getElementById('btn-' + tabId).classList.add('active');
+    
+    if (tabId === 'tab-armory') renderArmory();
+    if (tabId === 'tab-trade') checkTradeTab();
+}
+
+function renderArmory() {
+    updateUIStats();
+
+    // 1. Renderizar los 5 slots del Loadout
+    const lDiv = document.getElementById('armory-loadout');
+    lDiv.innerHTML = '';
+    for (let i = 0; i < 5; i++) {
+        const key = pData.loadout[i];
+        if (key && TOWER_DB[key]) {
+            const t = TOWER_DB[key];
+            lDiv.innerHTML += `
+                <div onclick="unequipTowerSlot(${i})" class="bg-[#1b2230] border-2 border-green-500 hover:border-red-500 rounded-2xl p-3 flex flex-col items-center justify-between min-h-[118px] cursor-pointer group transition shadow-lg">
+                    <div class="flex justify-between w-full text-[10px] font-extrabold">
+                        <span class="text-green-400">SLOT ${i + 1}</span>
+                        <span class="text-emerald-400">💵 $${t.placeCost}</span>
+                    </div>
+                    <i class="fa-solid ${t.icon} text-3xl text-white my-2 group-hover:scale-110 transition"></i>
+                    <div class="font-game text-sm text-white group-hover:hidden">${t.name}</div>
+                    <div class="font-game text-xs text-red-400 hidden group-hover:block"><i class="fa-solid fa-xmark"></i> QUITAR</div>
+                </div>`;
+        } else {
+            lDiv.innerHTML += `
+                <div class="border-2 border-dashed border-gray-600 rounded-2xl p-3 flex flex-col items-center justify-center min-h-[118px] text-gray-500 bg-black/25">
+                    <i class="fa-solid fa-plus text-xl mb-1"></i>
+                    <span class="text-xs font-bold uppercase">Hueco Libre</span>
+                </div>`;
+        }
+    }
+
+    // 2. Renderizar las 15 tropas en el catálogo
+    const cDiv = document.getElementById('armory-catalog');
+    cDiv.innerHTML = '';
+
+    Object.entries(TOWER_DB).forEach(([key, t]) => {
+        const isUnlocked = pData.unlocked.includes(key);
+        const isEquipped = pData.loadout.includes(key);
+        
+        let cardStateClass = '';
+        if (isEquipped) cardStateClass = 'equipped';
+        else if (isUnlocked) cardStateClass = 'unlocked';
+
+        let actionButtonHTML = '';
+        if (!isUnlocked) {
+            const canAfford = pData.shopCoins >= t.shopCost;
+            actionButtonHTML = `
+                <button onclick="buyTowerFromShop('${key}')" class="btn ${canAfford ? 'btn-green' : 'btn-dark'} w-full py-2.5 text-xs">
+                    <i class="fa-solid fa-coins text-yellow-300"></i> DESBLOQUEAR (${t.shopCost} 🪙)
+                </button>`;
+        } else if (isEquipped) {
+            actionButtonHTML = `
+                <button onclick="unequipTowerByKey('${key}')" class="btn btn-yellow w-full py-2.5 text-xs">
+                    <i class="fa-solid fa-check"></i> EQUIPADA (QUITAR)
+                </button>`;
+        } else {
+            actionButtonHTML = `
+                <button onclick="equipTowerByKey('${key}')" class="btn btn-blue w-full py-2.5 text-xs">
+                    <i class="fa-solid fa-plus"></i> EQUIPAR EN LOADOUT
+                </button>`;
+        }
+
+        cDiv.innerHTML += `
+            <div class="tower-card ${cardStateClass}">
+                <div>
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full ${t.cliff ? 'bg-purple-500/25 text-purple-300 border border-purple-500/40' : 'bg-sky-500/20 text-sky-300 border border-sky-500/30'} uppercase">
+                            ${t.cliff ? '⛰️ Montaña' : '🌱 Suelo'}
+                        </span>
+                        <span class="text-xs font-extrabold text-emerald-400" title="Coste en Efectivo dentro de la partida">
+                            En Partida: 💵 $${t.placeCost}
+                        </span>
+                    </div>
+
+                    <div class="my-3 flex flex-col items-center">
+                        <div class="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl text-white shadow-md mb-2 border border-white/15" style="background-color: #${t.color.toString(16).padStart(6, '0')}33;">
+                            <i class="fa-solid ${t.icon}"></i>
+                        </div>
+                        <h4 class="font-game text-lg text-white leading-tight">${t.name}</h4>
+                        <p class="text-[11px] text-gray-400 font-bold mt-0.5 text-center">${t.role}</p>
+                    </div>
+
+                    <div class="bg-[#0b0e15] rounded-xl p-2.5 grid grid-cols-3 gap-1 text-center text-[11px] border border-gray-800 mb-3">
+                        <div>
+                            <div class="text-gray-500 font-bold">DAÑO</div>
+                            <div class="font-extrabold text-red-400">${t.isFarm ? '+💵$' : t.damage}</div>
+                        </div>
+                        <div>
+                            <div class="text-gray-500 font-bold">CADENCIA</div>
+                            <div class="font-extrabold text-sky-400">${t.rate ? t.rate + 's' : 'Ronda'}</div>
+                        </div>
+                        <div>
+                            <div class="text-gray-500 font-bold">RANGO</div>
+                            <div class="font-extrabold text-purple-400">${t.range}m</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-auto">
+                    ${actionButtonHTML}
+                </div>
+            </div>`;
+    });
+}
+
+function buyTowerFromShop(key) {
+    const t = TOWER_DB[key];
+    if (pData.unlocked.includes(key)) return;
+    if (spendShopCoins(t.shopCost)) {
+        pData.unlocked.push(key);
+        sfx.play('buy');
+        const emptyIdx = pData.loadout.indexOf(null);
+        if (emptyIdx !== -1) {
+            pData.loadout[emptyIdx] = key;
+            showToast(`✅ ¡${t.name} desbloqueado por ${t.shopCost} 🪙 y equipado!`, true);
+        } else {
+            showToast(`✅ ¡${t.name} desbloqueado! Puedes equiparlo en tu Loadout.`, true);
+        }
+        savePlayerData();
+        renderArmory();
+    } else {
+        showToast(`❌ Necesitas ${t.shopCost} 🪙 Monedas de Tienda. ¡Juega partidas para ganar más!`);
+    }
+}
+
+function equipTowerByKey(key) {
+    if (pData.loadout.includes(key)) return;
+    const emptyIdx = pData.loadout.indexOf(null);
+    if (emptyIdx !== -1) {
+        pData.loadout[emptyIdx] = key;
+    } else {
+        pData.loadout[4] = key;
+    }
+    sfx.play('place');
+    savePlayerData();
+    renderArmory();
+    showToast(`🛡️ ${TOWER_DB[key].name} equipado en tu Loadout.`, true);
+}
+
+function unequipTowerSlot(slotIndex) {
+    const activeCount = pData.loadout.filter(x => x !== null).length;
+    if (activeCount <= 1) {
+        showToast('⚠️ Debes llevar al menos 1 tropa equipada.');
+        return;
+    }
+    pData.loadout[slotIndex] = null;
+    savePlayerData();
+    renderArmory();
+}
+
+function unequipTowerByKey(key) {
+    const idx = pData.loadout.indexOf(key);
+    if (idx !== -1) unequipTowerSlot(idx);
+}
+
+function createCoopRoom() {
+    document.getElementById('coop-box-init').classList.add('hidden');
+    const waitBox = document.getElementById('coop-box-wait');
+    waitBox.classList.remove('hidden'); waitBox.classList.add('flex');
+    document.getElementById('coop-code-text').innerText = Math.floor(1000 + Math.random() * 9000);
+    setTimeout(() => {
+        document.getElementById('coop-status-msg').innerText = '✅ ¡Compañero de escuadrón conectado!';
+        document.getElementById('coop-start-btn').classList.remove('hidden');
+    }, 2200);
+}
+
+function joinCoopRoom() {
+    const code = document.getElementById('coop-input').value.trim();
+    if (code.length === 4) startGame('medium');
+    else showToast('Introduce un código de 4 dígitos.');
+}
+
+function checkTradeTab() {
+    const locked = pData.level < 20;
+    document.getElementById('trade-locked').classList.toggle('hidden', !locked);
+    document.getElementById('trade-unlocked').classList.toggle('hidden', locked);
+}
+
+function executeTrade(key, cost) {
+    if (pData.unlocked.includes(key)) { showToast('Ya tienes esta unidad desbloqueada.'); return; }
+    if (spendShopCoins(cost)) {
+        pData.unlocked.push(key);
+        savePlayerData();
+        showToast('🤝 ¡Intercambio completado! Obtuviste Militant.', true);
+    } else showToast('No tienes suficientes Monedas de Tienda 🪙.');
+}
+
+// ==========================================
+// 6. INICIO DE PARTIDA Y ESCALADO POR DIFICULTAD
+// ==========================================
+function startGame(diff) {
+    const equipped = pData.loadout.filter(x => x !== null);
+    if (equipped.length === 0) pData.loadout[0] = 'scout';
+    
+    document.getElementById('hub-ui').style.display = 'none';
+    document.getElementById('game-ui').style.display = 'flex';
+    
+    gState.mode = 'game';
+    gState.difficulty = diff;
+    gState.hp = 100;
+    gState.wave = 0;
+    gState.active = false;
+    gState.speed = 1;
+    gState.auto = false;
+    
+    if (diff === 'easy') {
+        gState.maxWave = 15;
+        gState.matchCash = 650;
+        document.getElementById('ig-mode-badge').innerText = 'NIVEL FÁCIL (HP x1.0) • PREMIO VICTORIA: +100 🪙';
+    } else if (diff === 'medium') {
+        gState.maxWave = 20;
+        gState.matchCash = 600;
+        document.getElementById('ig-mode-badge').innerText = 'NIVEL MEDIO (HP x1.65) • PREMIO VICTORIA: +300 🪙';
+    } else if (diff === 'hard') {
+        gState.maxWave = 25;
+        gState.matchCash = 550;
+        document.getElementById('ig-mode-badge').innerText = 'NIVEL DIFÍCIL (HP x2.5) • PREMIO VICTORIA: +500 🪙';
+    } else {
+        gState.maxWave = '∞';
+        gState.matchCash = 800;
+        document.getElementById('ig-mode-badge').innerText = 'MODO ENDLESS • +25 🪙 POR CADA OLEADA';
+    }
+
+    // Limpiar escena 3D
+    gState.towers.forEach(t => scene.remove(t.mesh));
+    gState.enemies.forEach(e => { scene.remove(e.mesh); e.hudTag.remove(); });
+    gState.projectiles.forEach(p => scene.remove(p.mesh));
+    document.getElementById('vfx-layer').innerHTML = '';
+    gState.towers = [];
+    gState.enemies = [];
+    gState.projectiles = [];
+    closeInspector();
+    cancelPlacement();
+
+    cameraX = 0;
+    syncSideToSideCamera();
+    
+    renderIGHotbar();
+    updateIGStats();
+    updateToggleBtns();
+}
+
+function resetCameraSideCenter() {
+    cameraX = 0;
+    syncSideToSideCamera();
+}
+
+function updateIGStats() {
+    updateUIStats();
+    document.getElementById('ig-hp').innerText = `${Math.max(0, Math.floor(gState.hp))} / 100`;
+    document.getElementById('ig-wave').innerText = `Oleada ${gState.wave} / ${gState.maxWave}`;
+    const alive = gState.enemies.length + gState.enemiesQueue.length;
+    document.getElementById('ig-enemies-left').innerText = gState.active
+        ? `Enemigos en curso: ${alive}`
+        : 'Listo para enviar siguiente oleada';
+}
+
+function renderIGHotbar() {
+    const hb = document.getElementById('ig-hotbar');
+    hb.innerHTML = '';
+    pData.loadout.forEach((key, i) => {
+        if (!key || !TOWER_DB[key]) return;
+        const t = TOWER_DB[key];
+        hb.innerHTML += `
+            <div class="hotbar-slot" id="slot-${key}" onclick="prepPlacement('${key}')">
+                <div class="flex justify-between w-full items-center px-1">
+                    <span class="bg-gray-800 text-sky-400 text-[10px] px-1.5 py-0.5 rounded font-extrabold">${i + 1}</span>
+                    <span class="text-[9px] text-gray-400 font-bold">${t.cliff ? '⛰️' : '🌱'}</span>
+                </div>
+                <i class="fa-solid ${t.icon} text-white text-2xl my-1"></i>
+                <div class="text-[10px] font-game truncate w-full text-center">${t.name}</div>
+                <div class="text-[11px] text-emerald-400 font-extrabold bg-black/75 w-full text-center py-0.5 rounded-lg border border-emerald-500/40">
+                    $${t.placeCost}
+                </div>
+            </div>`;
+    });
+    updateUIStats();
+}
+
+function toggleSpeed() {
+    gState.speed = gState.speed === 1 ? 2 : 1;
+    updateToggleBtns();
+}
+function toggleAuto() {
+    gState.auto = !gState.auto;
+    updateToggleBtns();
+    if (gState.auto && !gState.active && gState.mode === 'game') startNextWave();
+}
+function updateToggleBtns() {
+    const bS = document.getElementById('btn-speed'), tS = document.getElementById('txt-speed');
+    tS.innerText = 'x' + gState.speed;
+    bS.className = `btn ${gState.speed > 1 ? 'btn-blue' : 'btn-dark'} px-3.5 py-2 text-xs w-32 flex justify-between`;
+
+    const bA = document.getElementById('btn-auto'), tA = document.getElementById('txt-auto');
+    tA.innerText = gState.auto ? 'ON' : 'OFF';
+    tA.className = gState.auto ? 'text-white font-bold' : 'text-red-400 font-bold';
+    bA.className = `btn ${gState.auto ? 'btn-green' : 'btn-dark'} px-3.5 py-2 text-xs w-32 flex justify-between`;
+}
+
+// ==========================================
+// 7. CONTROL DE CÁMARA LADO A LADO Y COLOCACIÓN DE TROPAS
+// ==========================================
+let isPointerDown = false;
+let pointerDownPos = { x: 0, y: 0 };
+let startCameraX = 0;
+
+window.addEventListener('pointerdown', e => {
+    if (gState.mode !== 'game' || e.target.tagName !== 'CANVAS') return;
+    isPointerDown = true;
+    pointerDownPos = { x: e.clientX, y: e.clientY };
+    startCameraX = cameraX;
+});
+
+window.addEventListener('pointermove', e => {
+    if (gState.mode !== 'game') return;
+
+    if (isPointerDown) {
+        const deltaX = e.clientX - pointerDownPos.x;
+        if (Math.abs(deltaX) > 4) {
+            cameraX = startCameraX - (deltaX * 0.095);
+            syncSideToSideCamera();
+        }
+    }
+
+    if (!gState.selectedId) return;
+    mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+    
+    raycaster.setFromCamera(mouse, camera);
+    const hits = raycaster.intersectObjects([groundPlane, ...cliffColliders], true);
+    if (hits.length > 0) {
+        const hit = hits[0].object;
+        const pt = hits[0].point;
+        const isCliff = hit.userData.isCliff || false;
+        
+        const py = isCliff ? hit.userData.topY : 0.1;
+        placementIndicator.position.set(pt.x, py + 1.1, pt.z);
+        rangeRing.position.set(pt.x, py + 0.12, pt.z);
+        
+        let valid = (TOWER_DB[gState.selectedId].cliff === isCliff);
+        if (!isCliff) {
+            for (let j = 0; j < pathNodes.length - 1; j++) {
+                if (distToSegment(pt, pathNodes[j], pathNodes[j + 1]) < 5.0) { valid = false; break; }
+            }
+        }
+        for (const t of gState.towers) {
+            if (Math.hypot(t.mesh.position.x - pt.x, t.mesh.position.z - pt.z) < 2.3) { valid = false; break; }
+        }
+
+        placementIndicator.material.color.setHex(valid ? 0x00ff66 : 0xff2222);
+        placementIndicator.userData.valid = valid;
+        placementIndicator.userData.groundY = py;
+    }
+});
+
+window.addEventListener('pointerup', e => {
+    if (gState.mode !== 'game') return;
+    const wasDown = isPointerDown;
+    isPointerDown = false;
+    if (!wasDown || e.target.tagName !== 'CANVAS') return;
+
+    const movedDist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
+    if (movedDist > 7) return;
+
+    mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+    if (gState.selectedId) {
+        if (e.button !== 0) { cancelPlacement(); return; }
+        if (placementIndicator.userData.valid) {
+            placeTower(gState.selectedId, placementIndicator.position.clone(), placementIndicator.userData.groundY || 0);
+            cancelPlacement();
+        } else {
+            const needCliff = TOWER_DB[gState.selectedId].cliff;
+            showToast(needCliff ? '⛰️ Esta unidad debe colocarse sobre una Montaña.' : '⚠️ Coloca la unidad en el suelo fuera de la pasarela.');
+        }
+    } else {
+        raycaster.setFromCamera(mouse, camera);
+        const tMeshes = gState.towers.map(t => t.mesh);
+        const hits = raycaster.intersectObjects(tMeshes, true);
+        if (hits.length > 0) {
+            let obj = hits[0].object;
+            while (obj.parent && !obj.userData.towerRef) obj = obj.parent;
+            if (obj && obj.userData.towerRef) {
+                openInspector(obj.userData.towerRef);
+                return;
+            }
+        }
+        closeInspector();
+    }
+});
+
+window.addEventListener('keydown', e => {
+    if (gState.mode !== 'game') return;
+    const k = e.key.toLowerCase();
+    if (k === 'a' || e.key === 'ArrowLeft') gState.keys.left = true;
+    if (k === 'd' || e.key === 'ArrowRight') gState.keys.right = true;
+    if (e.key === 'Escape') { cancelPlacement(); closeInspector(); }
+    if (k === 'e' && gState.inspectedTower) upgradeSelectedTower();
+    if ((k === 'x' || e.key === 'Backspace') && gState.inspectedTower) sellSelectedTower();
+    if (e.key >= '1' && e.key <= '5') {
+        const key = pData.loadout[parseInt(e.key) - 1];
+        if (key) prepPlacement(key);
+    }
+});
+
+window.addEventListener('keyup', e => {
+    const k = e.key.toLowerCase();
+    if (k === 'a' || e.key === 'ArrowLeft') gState.keys.left = false;
+    if (k === 'd' || e.key === 'ArrowRight') gState.keys.right = false;
+});
+
+function prepPlacement(id) {
+    const cfg = TOWER_DB[id];
+    if (gState.matchCash < cfg.placeCost) {
+        showToast(`❌ Necesitas $${cfg.placeCost} de Efectivo en partida para desplegar ${cfg.name}.`);
+        return;
+    }
+    gState.selectedId = id;
+    document.querySelectorAll('.hotbar-slot').forEach(e => e.classList.remove('selected'));
+    const slotEl = document.getElementById('slot-' + id);
+    if (slotEl) slotEl.classList.add('selected');
+
+    document.getElementById('placement-hint-text').innerText = cfg.cliff
+        ? `⛰️ Haz clic encima de una MONTAÑA para desplegar ${cfg.name} ($${cfg.placeCost})`
+        : `🌱 Haz clic en el SUELO para desplegar ${cfg.name} ($${cfg.placeCost})`;
+    const hint = document.getElementById('placement-hint');
+    hint.classList.remove('hidden'); hint.classList.add('flex');
+
+    placementIndicator.visible = true;
+    rangeRing.visible = true;
+    rangeRing.scale.set(cfg.range, cfg.range, 1);
+    closeInspector();
+}
+
+function cancelPlacement() {
+    gState.selectedId = null;
+    document.querySelectorAll('.hotbar-slot').forEach(e => e.classList.remove('selected'));
+    const hint = document.getElementById('placement-hint');
+    hint.classList.add('hidden'); hint.classList.remove('flex');
+    placementIndicator.visible = false;
+    if (!gState.inspectedTower) rangeRing.visible = false;
+}
+
+function buildRobloxTowerMesh(cfg) {
+    const grp = new THREE.Group();
+    const bodyMat = new THREE.MeshStandardMaterial({ color: cfg.color, roughness: 0.6 });
+    const skinMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.5 });
+    const hatMat = new THREE.MeshStandardMaterial({ color: cfg.hatColor, roughness: 0.4 });
+    const gunMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.6, roughness: 0.3 });
+
+    const pad = new THREE.Mesh(
+        new THREE.CylinderGeometry(1.15, 1.25, 0.25, 20),
+        new THREE.MeshStandardMaterial({ color: 0x334155 })
+    );
+    pad.position.y = 0.12;
+    grp.add(pad);
+
+    if (cfg.isFarm) {
+        const baseBox = new THREE.Mesh(new THREE.BoxGeometry(1.9, 1.2, 1.9), new THREE.MeshStandardMaterial({ color: 0x15803d }));
+        baseBox.position.y = 0.7; baseBox.castShadow = true;
+        const crystal = new THREE.Mesh(new THREE.OctahedronGeometry(0.75), new THREE.MeshStandardMaterial({ color: 0x10f587, emissive: 0x059669, emissiveIntensity: 0.6 }));
+        crystal.position.y = 2.1;
+        grp.add(baseBox, crystal);
+        grp.userData.muz = new THREE.Vector3(0, 2.1, 0);
+        grp.userData.crystal = crystal;
+        return grp;
+    }
+
+    const torso = new THREE.Mesh(new THREE.BoxGeometry(1.15, 1.35, 0.65), bodyMat);
+    torso.position.y = 1.5; torso.castShadow = true;
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.82, 0.82), skinMat);
+    head.position.y = 2.6; head.castShadow = true;
+    const hat = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.28, 0.9), hatMat);
+    hat.position.y = 3.1; hat.castShadow = true;
+
+    const armGeo = new THREE.BoxGeometry(0.38, 1.15, 0.38);
+    const lA = new THREE.Mesh(armGeo, bodyMat); lA.position.set(-0.78, 1.75, 0.25); lA.rotation.x = -Math.PI / 2.3;
+    const rA = new THREE.Mesh(armGeo, bodyMat); rA.position.set(0.78, 1.75, 0.25); rA.rotation.x = -Math.PI / 2.3;
+    
+    const gun = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.24, 1.55), gunMat);
+    gun.position.set(0.78, 1.85, 0.95); gun.castShadow = true;
+    
+    const legGeo = new THREE.BoxGeometry(0.48, 0.9, 0.48);
+    const lL = new THREE.Mesh(legGeo, new THREE.MeshStandardMaterial({ color: 0x1e293b })); lL.position.set(-0.32, 0.6, 0);
+    const rL = new THREE.Mesh(legGeo, new THREE.MeshStandardMaterial({ color: 0x1e293b })); rL.position.set(0.32, 0.6, 0);
+
+    grp.add(torso, head, hat, lA, rA, gun, lL, rL);
+    grp.userData.muz = new THREE.Vector3(0.78, 1.85, 1.7);
+    grp.userData.gunMesh = gun;
+    return grp;
+}
+
+function applyVisualUpgradeToMesh(tower) {
+    const grp = tower.mesh;
+    const lvl = tower.level;
+    grp.scale.setScalar(1 + (lvl - 1) * 0.06);
+
+    if (lvl === 2) {
+        const visor = new THREE.Mesh(
+            new THREE.BoxGeometry(0.86, 0.22, 0.2),
+            new THREE.MeshBasicMaterial({ color: 0x00ffff })
+        );
+        visor.position.set(0, 2.62, 0.42);
+        grp.add(visor);
+    } else if (lvl === 3) {
+        const goldMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, metalness: 0.7, roughness: 0.2 });
+        const pL = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.35, 0.75), goldMat); pL.position.set(-0.82, 2.15, 0);
+        const pR = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.35, 0.75), goldMat); pR.position.set(0.82, 2.15, 0);
+        grp.add(pL, pR);
+    } else if (lvl === 4) {
+        if (grp.userData.gunMesh) {
+            grp.userData.gunMesh.material = new THREE.MeshStandardMaterial({ color: 0xfacc15, emissive: 0xb45309, emissiveIntensity: 0.4 });
+            grp.userData.gunMesh.scale.set(1.3, 1.3, 1.25);
+        }
+    } else if (lvl === 5) {
+        const aura = new THREE.Mesh(
+            new THREE.TorusGeometry(1.35, 0.1, 12, 32),
+            new THREE.MeshBasicMaterial({ color: 0x00ff88 })
+        );
+        aura.rotateX(Math.PI / 2);
+        aura.position.y = 0.25;
+        grp.add(aura);
+    }
+}
+
+function placeTower(id, pos, groundY) {
+    const cfg = TOWER_DB[id];
+    if (!spendMatchCash(cfg.placeCost)) return;
+
+    const mesh = buildRobloxTowerMesh(cfg);
+    mesh.position.set(pos.x, groundY, pos.z);
+    scene.add(mesh);
+    sfx.play('place');
+
+    const newTower = {
+        id: Date.now() + Math.random(),
+        type: id,
+        level: 1,
+        targetMode: 'Primero',
+        mesh: mesh,
+        stats: { ...cfg },
+        invested: cfg.placeCost,
+        lastS: 0,
+        kills: 0
+    };
+    mesh.userData.towerRef = newTower;
+    gState.towers.push(newTower);
+    updateIGStats();
+    openInspector(newTower);
+}
+
+// ==========================================
+// 8. INSPECTOR DE MEJORAS Y VENTA (USA EFECTIVO $)
+// ==========================================
+function getUpgradeCost(tower) {
+    return Math.floor(tower.stats.placeCost * 0.8 * tower.level);
+}
+
+function openInspector(t) {
+    gState.inspectedTower = t;
+    const ui = document.getElementById('inspector-ui');
+    ui.classList.remove('hidden'); ui.classList.add('flex');
+    refreshInspectorUI(t);
+}
+
+function refreshInspectorUI(t) {
+    if (!t) return;
+    const baseCfg = TOWER_DB[t.type];
+    rangeRing.scale.set(t.stats.range, t.stats.range, 1);
+    rangeRing.position.set(t.mesh.position.x, t.mesh.position.y + 0.15, t.mesh.position.z);
+    rangeRing.visible = true;
+
+    document.getElementById('insp-icon').className = `fa-solid ${baseCfg.icon}`;
+    document.getElementById('insp-name').innerText = baseCfg.name;
+    document.getElementById('insp-lvl').innerText = t.level >= 5 ? '🌟 NIVEL 5 (MÁXIMO)' : `NIVEL ${t.level} / 5`;
+    document.getElementById('insp-target-btn').innerText = t.targetMode;
+    document.getElementById('insp-kills').innerText = t.kills;
+
+    const btnUpg = document.getElementById('btn-upg');
+    if (t.level < 5) {
+        const nextDmg = t.stats.isFarm ? 0 : Math.max(t.stats.damage + 5, Math.floor(t.stats.damage * 1.45));
+        const nextRate = t.stats.rate > 0 ? Math.max(0.06, parseFloat((t.stats.rate * 0.86).toFixed(2))) : 0;
+        const nextRng = Math.floor(t.stats.range * 1.12) + 1;
+
+        document.getElementById('insp-dmg').innerHTML = t.stats.isFarm
+            ? `+$${80 * t.level} <span class="text-emerald-400">➔ +$${80 * (t.level + 1)}</span>`
+            : `${t.stats.damage} <span class="text-emerald-400">➔ ${nextDmg}</span>`;
+        document.getElementById('insp-rate').innerHTML = t.stats.rate > 0
+            ? `${t.stats.rate}s <span class="text-emerald-400">➔ ${nextRate}s</span>`
+            : `Por Oleada`;
+        document.getElementById('insp-rng').innerHTML = `${Math.round(t.stats.range)}m <span class="text-emerald-400">➔ ${nextRng}m</span>`;
+
+        const cost = getUpgradeCost(t);
+        document.getElementById('insp-cost').innerText = `💵 $${cost}`;
+        btnUpg.disabled = gState.matchCash < cost;
+        document.getElementById('insp-next-perk').innerText = `Nivel ${t.level + 1}: +45% potencia y evolución 3D`;
+    } else {
+        document.getElementById('insp-dmg').innerHTML = t.stats.isFarm ? `+$${80 * t.level} (MAX)` : `${t.stats.damage} <span class="text-yellow-400">(MAX)</span>`;
+        document.getElementById('insp-rate').innerHTML = t.stats.rate > 0 ? `${t.stats.rate}s <span class="text-yellow-400">(MAX)</span>` : 'Por Oleada';
+        document.getElementById('insp-rng').innerHTML = `${Math.round(t.stats.range)}m <span class="text-yellow-400">(MAX)</span>`;
+        document.getElementById('insp-cost').innerText = 'MÁXIMO';
+        btnUpg.disabled = true;
+        document.getElementById('insp-next-perk').innerText = '🌟 ¡Esta unidad ha alcanzado su nivel máximo!';
+    }
+
+    const sellValue = Math.floor(t.invested * 0.7);
+    document.getElementById('insp-sell').innerText = `+$${sellValue}`;
+}
+
+function closeInspector() {
+    gState.inspectedTower = null;
+    const ui = document.getElementById('inspector-ui');
+    ui.classList.add('hidden'); ui.classList.remove('flex');
+    if (!gState.selectedId) rangeRing.visible = false;
+}
+
+function cycleTargetMode() {
+    const t = gState.inspectedTower;
+    if (!t) return;
+    const modes = ['Primero', 'Más Fuerte', 'Último', 'Cercano'];
+    const idx = (modes.indexOf(t.targetMode) + 1) % modes.length;
+    t.targetMode = modes[idx];
+    refreshInspectorUI(t);
+}
+
+function upgradeSelectedTower() {
+    const t = gState.inspectedTower;
+    if (!t || t.level >= 5) return;
+    const cost = getUpgradeCost(t);
+    if (!spendMatchCash(cost)) {
+        showToast(`❌ Necesitas $${cost} de Efectivo en partida para mejorar.`);
+        return;
+    }
+    t.invested += cost;
+    t.level++;
+    if (!t.stats.isFarm) {
+        t.stats.damage = Math.max(t.stats.damage + 5, Math.floor(t.stats.damage * 1.45));
+    }
+    if (t.stats.rate > 0) {
+        t.stats.rate = Math.max(0.06, parseFloat((t.stats.rate * 0.86).toFixed(2)));
+    }
+    t.stats.range = Math.floor(t.stats.range * 1.12) + 1;
+
+    applyVisualUpgradeToMesh(t);
+    sfx.play('upgrade');
+    floatingText(t.mesh.position, `⬆️ NIVEL ${t.level}!`, 'text-sky-300');
+    refreshInspectorUI(t);
+    updateIGStats();
+}
+
+function sellSelectedTower() {
+    const t = gState.inspectedTower;
+    if (!t) return;
+    const refund = Math.floor(t.invested * 0.7);
+    addMatchCash(refund);
+    sfx.play('sell');
+    floatingText(t.mesh.position, `+$${refund}`, 'text-emerald-400');
+    scene.remove(t.mesh);
+    gState.towers = gState.towers.filter(x => x !== t);
+    closeInspector();
+    updateIGStats();
+}
+
+// ==========================================
+// 9. MOTOR DE OLEADAS, ESCALADO DE DIFICULTAD Y VIDA FLOTANTE
+// ==========================================
+function startNextWave() {
+    if (gState.active) return;
+    gState.wave++;
+    gState.active = true;
+    document.getElementById('btn-next-wave').disabled = true;
+    
+    const count = 6 + Math.floor(gState.wave * 2.5);
+    gState.enemiesQueue = [];
+    for (let i = 0; i < count; i++) {
+        let type = 'normal';
+        if (gState.wave >= 2 && i % 3 === 0) type = 'speedy';
+        if (gState.wave >= 4 && i % 4 === 0) type = 'slow';
+        if (gState.wave >= 6 && i % 5 === 0) type = 'hidden';
+        gState.enemiesQueue.push(type);
+    }
+    // Jefes cada 5 oleadas (y múltiples jefes en oleadas avanzadas)
+    if (gState.wave % 5 === 0) {
+        const bossCount = Math.max(1, Math.floor(gState.wave / 10));
+        for (let b = 0; b < bossCount; b++) gState.enemiesQueue.push('boss');
+    }
+    updateIGStats();
+}
+
+function createRobloxEnemyMesh(db) {
+    const grp = new THREE.Group();
+    const bodyMat = new THREE.MeshStandardMaterial({ color: db.color, roughness: 0.6 });
+    const skinMat = new THREE.MeshStandardMaterial({ color: db.skin, roughness: 0.5 });
+
+    const torso = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.35, 0.6), bodyMat);
+    torso.position.y = 1.45; torso.castShadow = true;
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.8, 0.8), skinMat);
+    head.position.y = 2.55; head.castShadow = true;
+
+    const limbGeo = new THREE.BoxGeometry(0.38, 1.0, 0.38);
+    const lArm = new THREE.Mesh(limbGeo, skinMat); lArm.position.set(-0.75, 1.65, 0.3); lArm.rotation.x = -Math.PI / 2.2;
+    const rArm = new THREE.Mesh(limbGeo, skinMat); rArm.position.set(0.75, 1.65, 0.3); rArm.rotation.x = -Math.PI / 2.2;
+
+    const lLeg = new THREE.Mesh(limbGeo, bodyMat); lLeg.position.set(-0.3, 0.55, 0);
+    const rLeg = new THREE.Mesh(limbGeo, bodyMat); rLeg.position.set(0.3, 0.55, 0);
+
+    grp.add(torso, head, lArm, rArm, lLeg, rLeg);
+    grp.userData.legs = [lLeg, rLeg];
+    return grp;
+}
+
+function spawnEnemy(type) {
+    const db = ENEMY_DB[type];
+    const grp = createRobloxEnemyMesh(db);
+    grp.scale.setScalar(db.scale);
+    grp.position.copy(pathNodes[0]);
+    scene.add(grp);
+
+    // Multiplicador de HP por dificultad + Escalado progresivo por cada oleada
+    let diffMult = 1.0;
+    if (gState.difficulty === 'medium') diffMult = 1.65;
+    else if (gState.difficulty === 'hard') diffMult = 2.50;
+    else if (gState.difficulty === 'endless') diffMult = 1.75;
+
+    const waveScaling = gState.difficulty === 'endless'
+        ? Math.pow(1.24, gState.wave - 1)
+        : (1 + (gState.wave - 1) * 0.38 + Math.pow(gState.wave - 1, 1.35) * 0.08);
+
+    const maxHp = Math.max(10, Math.round(db.hp * diffMult * waveScaling));
+
+    // Etiqueta flotante 2D con Nombre, Barra de Vida y HP Numérico Exacto arriba de la cabeza
+    const hudTag = document.createElement('div');
+    hudTag.className = 'enemy-hud-tag';
+    hudTag.innerHTML = `
+        <div class="enemy-name-label">${db.name.toUpperCase()}</div>
+        <div class="enemy-hp-box">
+            <div class="enemy-hp-fill" style="width: 100%;"></div>
+            <div class="enemy-hp-num">${maxHp} / ${maxHp} HP</div>
+        </div>
+    `;
+    document.getElementById('vfx-layer').appendChild(hudTag);
+
+    gState.enemies.push({
+        type: type,
+        mesh: grp,
+        hudTag: hudTag,
+        fillEl: hudTag.querySelector('.enemy-hp-fill'),
+        numEl: hudTag.querySelector('.enemy-hp-num'),
+        hp: maxHp,
+        max: maxHp,
+        speed: db.speed,
+        slowTimer: 0,
+        cashRew: Math.round(db.cashReward * (1 + (gState.wave - 1) * 0.08)),
+        pIdx: 0,
+        progress: 0,
+        headHeight: 3.3 * db.scale
+    });
+    updateIGStats();
+}
+
+function updateEnemyHealthUI(en) {
+    const cur = Math.max(0, Math.ceil(en.hp));
+    const pct = Math.max(0, Math.min(100, (cur / en.max) * 100));
+    en.fillEl.style.width = `${pct}%`;
+    if (pct > 55) en.fillEl.style.backgroundColor = '#00e676';
+    else if (pct > 25) en.fillEl.style.backgroundColor = '#facc15';
+    else en.fillEl.style.backgroundColor = '#ef4444';
+    en.numEl.innerText = `${cur} / ${en.max} HP`;
+}
+
+function floatingText(pos, txt, cls = 'text-red-400') {
+    const el = document.createElement('div');
+    el.className = `dmg-text ${cls}`;
+    el.innerText = txt;
+    document.getElementById('vfx-layer').appendChild(el);
+    const p = pos.clone(); p.y += 3.2; p.project(camera);
+    el.style.left = `${(p.x * 0.5 + 0.5) * window.innerWidth}px`;
+    el.style.top = `${(p.y * -0.5 + 0.5) * window.innerHeight}px`;
+    setTimeout(() => el.remove(), 800);
+}
+
+function drawTracer(p1, p2, color) {
+    const geo = new THREE.BufferGeometry().setFromPoints([p1, p2]);
+    const line = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: color, transparent: true, opacity: 0.9 }));
+    scene.add(line);
+    gState.projectiles.push({ mesh: line, life: 0.09 });
+}
+
+function selectTargetForTower(tower) {
+    const inRange = gState.enemies.filter(e => tower.mesh.position.distanceTo(e.mesh.position) <= tower.stats.range);
+    if (inRange.length === 0) return null;
+
+    if (tower.targetMode === 'Más Fuerte') {
+        return inRange.reduce((a, b) => (b.hp > a.hp ? b : a));
+    } else if (tower.targetMode === 'Último') {
+        return inRange.reduce((a, b) => (b.progress < a.progress ? b : a));
+    } else if (tower.targetMode === 'Cercano') {
+        return inRange.reduce((a, b) => (
+            tower.mesh.position.distanceTo(b.mesh.position) < tower.mesh.position.distanceTo(a.mesh.position) ? b : a
+        ));
+    }
+    return inRange.reduce((a, b) => (b.progress > a.progress ? b : a));
+}
+
+// Recompensas exactas de Monedas de Tienda (🪙) al finalizar la partida:
+// Fácil = 100 🪙 | Medio = 300 🪙 | Difícil = 500 🪙
+function endGame(victory) {
+    gState.active = false;
+    document.getElementById('end-screen').style.display = 'flex';
+    const pnl = document.getElementById('end-panel');
+
+    let coinsReward = 0;
+    if (victory) {
+        if (gState.difficulty === 'easy') coinsReward = 100;
+        else if (gState.difficulty === 'medium') coinsReward = 300;
+        else if (gState.difficulty === 'hard') coinsReward = 500;
+        else coinsReward = gState.wave * 25;
+
+        document.getElementById('end-icon').className = 'fa-solid fa-trophy text-7xl mb-4 text-yellow-400';
+        document.getElementById('end-title').innerText = '¡VICTORIA!';
+        document.getElementById('end-desc').innerText = `¡Completaste el modo ${gState.difficulty.toUpperCase()} y ganaste +${coinsReward} Monedas de Tienda!`;
+        pnl.style.borderColor = 'var(--yellow)';
+    } else {
+        // Consolación proporcional si pierde antes del final
+        const baseWin = gState.difficulty === 'easy' ? 100 : (gState.difficulty === 'medium' ? 300 : 500);
+        coinsReward = gState.difficulty === 'endless' ? 0 : Math.floor((gState.wave / gState.maxWave) * (baseWin * 0.35));
+        document.getElementById('end-icon').className = 'fa-solid fa-skull text-7xl mb-4 text-red-500';
+        document.getElementById('end-title').innerText = 'BASE DESTRUIDA';
+        document.getElementById('end-desc').innerText = 'Las hordas enemigas superaron tus defensas.';
+        pnl.style.borderColor = 'var(--red)';
+    }
+
+    const xpGained = Math.floor(gState.wave * (victory ? 25 : 10));
+    document.getElementById('end-waves').innerText = `${gState.wave} / ${gState.maxWave}`;
+    document.getElementById('end-coins').innerText = `+${coinsReward} 🪙`;
+    document.getElementById('end-xp').innerText = `+${xpGained} XP`;
+
+    if (coinsReward > 0) addShopCoins(coinsReward);
+    addXp(xpGained);
+}
+
+function returnToHub() {
+    gState.active = false;
+    gState.mode = 'hub';
+    document.getElementById('end-screen').style.display = 'none';
+    document.getElementById('game-ui').style.display = 'none';
+    document.getElementById('hub-ui').style.display = 'flex';
+    closeInspector();
+    cancelPlacement();
+    updateUIStats();
+    renderArmory();
+}
+
+// ==========================================
+// 10. BUCLE PRINCIPAL DE ANIMACIÓN
+// ==========================================
+function animate() {
+    requestAnimationFrame(animate);
+    
+    const rawDelta = Math.min(0.1, clock.getDelta());
+    const time = clock.getElapsedTime();
+
+    if (gState.mode === 'game') {
+        if (gState.keys.left) { cameraX -= 32 * rawDelta; syncSideToSideCamera(); }
+        if (gState.keys.right) { cameraX += 32 * rawDelta; syncSideToSideCamera(); }
+
+        const delta = rawDelta * gState.speed;
+        const cTime = time * gState.speed;
+
+        // Spawner de enemigos
+        if (gState.active && gState.enemiesQueue.length > 0) {
+            gState.spawnTimer -= delta;
+            if (gState.spawnTimer <= 0) {
+                spawnEnemy(gState.enemiesQueue.shift());
+                gState.spawnTimer = 0.72;
+            }
+        }
+
+        // Actualizar movimiento y barra de vida sobre la cabeza de cada enemigo
+        for (let i = gState.enemies.length - 1; i >= 0; i--) {
+            const e = gState.enemies[i];
+            if (e.slowTimer > 0) e.slowTimer -= delta;
+            const curSpeed = e.slowTimer > 0 ? e.speed * 0.55 : e.speed;
+
+            const tgt = pathNodes[e.pIdx + 1];
+            if (tgt) {
+                const dir = new THREE.Vector3().subVectors(tgt, e.mesh.position);
+                dir.y = 0;
+                const step = curSpeed * delta;
+                if (dir.length() <= step) {
+                    e.mesh.position.set(tgt.x, 0, tgt.z);
+                    e.pIdx++;
+                } else {
+                    dir.normalize();
+                    e.mesh.position.addScaledVector(dir, step);
+                    e.mesh.lookAt(tgt.x, e.mesh.position.y, tgt.z);
+                }
+                e.progress += step;
+
+                // Animación de caminata Roblox
+                const walkAngle = Math.sin(cTime * curSpeed * 1.8) * 0.55;
+                if (e.mesh.userData.legs) {
+                    e.mesh.userData.legs[0].rotation.x = walkAngle;
+                    e.mesh.userData.legs[1].rotation.x = -walkAngle;
+                }
+                
+                // Proyectar etiqueta de vida 2D exactamente encima del enemigo
+                const p2 = e.mesh.position.clone();
+                p2.y += e.headHeight;
+                p2.project(camera);
+                e.hudTag.style.left = `${(p2.x * 0.5 + 0.5) * window.innerWidth}px`;
+                e.hudTag.style.top = `${(p2.y * -0.5 + 0.5) * window.innerHeight}px`;
+            } else {
+                const hpLoss = e.type === 'boss' ? 35 : 10;
+                gState.hp -= hpLoss;
+                e.hudTag.remove();
+                scene.remove(e.mesh);
+                gState.enemies.splice(i, 1);
+                updateIGStats();
+                if (gState.hp <= 0) { endGame(false); break; }
+            }
+        }
+
+        // Disparo de Torres
+        gState.towers.forEach(t => {
+            if (t.mesh.userData.crystal) {
+                t.mesh.userData.crystal.rotation.y += delta * 2;
+            }
+            if (t.stats.damage > 0 && cTime - t.lastS >= t.stats.rate) {
+                const tgt = selectTargetForTower(t);
+                if (tgt) {
+                    t.mesh.lookAt(tgt.mesh.position.x, t.mesh.position.y, tgt.mesh.position.z);
+                    t.lastS = cTime;
+                    const mWorld = t.mesh.userData.muz.clone().applyMatrix4(t.mesh.matrixWorld);
+                    const tWorld = tgt.mesh.position.clone(); tWorld.y += 1.4;
+                    drawTracer(mWorld, tWorld, t.stats.color);
+                    sfx.play('shoot');
+                    
+                    let hits = [tgt];
+                    if (t.stats.aoe) {
+                        hits = gState.enemies.filter(e => e.mesh.position.distanceTo(tgt.mesh.position) <= t.stats.aoe);
+                    }
+                    
+                    hits.forEach(en => {
+                        en.hp -= t.stats.damage;
+                        if (t.stats.slows) en.slowTimer = 2.5;
+                        updateEnemyHealthUI(en);
+                        floatingText(en.mesh.position, `-${t.stats.damage}`);
+
+                        if (en.hp <= 0 && !en.dead) {
+                            en.dead = true;
+                            // Recompensa en Efectivo de Partida ($)
+                            addMatchCash(en.cashRew);
+                            t.kills++;
+                            en.hudTag.remove();
+                            scene.remove(en.mesh);
+                            const idx = gState.enemies.indexOf(en);
+                            if (idx > -1) gState.enemies.splice(idx, 1);
+                            updateIGStats();
+                        }
+                    });
+                }
+            }
+        });
+
+        // Limpiar proyectiles láser
+        for (let i = gState.projectiles.length - 1; i >= 0; i--) {
+            const p = gState.projectiles[i];
+            p.life -= delta;
+            p.mesh.material.opacity = Math.max(0, p.life / 0.09);
+            if (p.life <= 0) {
+                scene.remove(p.mesh);
+                gState.projectiles.splice(i, 1);
+            }
+        }
+
+        // Fin de oleada
+        if (gState.active && gState.enemiesQueue.length === 0 && gState.enemies.length === 0) {
+            gState.active = false;
+            document.getElementById('btn-next-wave').disabled = false;
+            
+            const waveCashBonus = 110 + (gState.wave * 30);
+            addMatchCash(waveCashBonus);
+            sfx.play('coin');
+
+            if (gState.difficulty === 'endless') {
+                addShopCoins(25);
+                showToast(`💵 +$${waveCashBonus} Efectivo y +25 🪙 Monedas (Endless)!`, true);
+            } else {
+                showToast(`💵 ¡Oleada ${gState.wave} superada! +$${waveCashBonus} de Efectivo`, true);
+            }
+            
+            gState.towers.forEach(t => {
+                if (t.stats.isFarm) {
+                    const farmCash = 80 * t.level;
+                    addMatchCash(farmCash);
+                    floatingText(t.mesh.position, `+$${farmCash}`, 'text-emerald-300');
+                }
+                if (t.stats.isMedic) {
+                    const heal = 8 * t.level;
+                    gState.hp = Math.min(100, gState.hp + heal);
+                    floatingText(t.mesh.position, `+${heal} ❤️`, 'text-green-400');
+                }
+            });
+            updateIGStats();
+
+            if (gState.difficulty !== 'endless' && gState.wave >= gState.maxWave) {
+                endGame(true);
+            } else if (gState.auto) {
+                setTimeout(() => { if (!gState.active && gState.mode === 'game') startNextWave(); }, 900);
+            }
+        }
+    } else {
+        camera.position.set(Math.sin(time * 0.22) * 20, CAMERA_FIXED_Y, CAMERA_FIXED_Z);
+        camera.lookAt(Math.sin(time * 0.22) * 14, 0, -4);
+    }
+
+    renderer.render(scene, camera);
+}
+
+window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+window.addEventListener('DOMContentLoaded', () => {
+    renderArmory();
+    updateUIStats();
+    animate();
+});
+</script>
+</body>
+</html>
